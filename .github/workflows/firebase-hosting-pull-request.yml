@@ -16,4 +16,5 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}
           projectId: doc-template-front-dev
+          channelId: live
           target: dev  # Deploys to the "dev" target in firebase.json
