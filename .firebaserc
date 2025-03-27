@@ -7,12 +7,16 @@
   "targets": {
     "doc-template-front": {
       "hosting": {
-        "production": ["doc-template-front"]
+        "production": [
+          "doc-template-front"
+        ]
       }
     },
     "doc-template-front-dev": {
       "hosting": {
-        "dev": ["doc-template-front-dev"]
+        "dev": [
+          "doc-template-front-dev"
+        ]
       }
     }
   }
