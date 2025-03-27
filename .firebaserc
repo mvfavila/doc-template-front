@@ -1,5 +1,19 @@
 {
   "projects": {
-    "default": "doc-template-front"
+    "default": "doc-template-front",
+    "production": "doc-template-front",
+    "dev": "doc-template-front-dev"
+  },
+  "targets": {
+    "doc-template-front": {
+      "hosting": {
+        "production": ["doc-template-front"]
+      }
+    },
+    "doc-template-front-dev": {
+      "hosting": {
+        "dev": ["doc-template-front-dev"]
+      }
+    }
   }
 }
