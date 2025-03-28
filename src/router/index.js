@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "@/views/Home.vue";
 import SignIn from "@/views/SignIn.vue";
-import { auth } from "@/firebase"; // Changed import
+import { auth } from "@/firebase";
 
 const routes = [
   {
@@ -25,7 +25,7 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes,
 });
 
@@ -34,11 +34,11 @@ router.beforeEach(async (to, from, next) => {
   const isPublic = to.matched.some((record) => record.meta.public);
 
   if (requiresAuth) {
-    const user = auth.currentUser; // Now using the centralized auth instance
+    const user = auth.currentUser;
     if (user) {
       next();
     } else {
-      next("/signin"); // Changed from '/login' to match your route
+      next("/signin");
     }
   } else if (isPublic) {
     next();

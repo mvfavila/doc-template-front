@@ -4,7 +4,7 @@
       <section class="hero">
         <h2>Seu escritório jurídico digital</h2>
         <p>Soluções jurídicas completas com acompanhamento online</p>
-        <router-link to="/login" class="cta-button"
+        <router-link to="/signin" class="cta-button"
           >Acessar Sistema</router-link
         >
       </section>

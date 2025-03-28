@@ -11,13 +11,20 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
+      "vue",
+      "vue-router",
       "firebase/app",
       "firebase/auth",
       "firebase/firestore",
       "firebase/storage",
     ],
   },
+  build: {
+    rollupOptions: {
+      external: ["firebase/auth", "firebase/firestore", "firebase/storage"],
+    },
+  },
   server: {
-    host: true  // Allows local network access
-  }
+    host: true,
+  },
 });

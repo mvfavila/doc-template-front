@@ -9,13 +9,13 @@
           <button @click="showUserModal = true" class="action-button">
             Adicionar Novo Cliente
           </button>
-          <client-list />
+          <client-list :clients="clients" />
         </div>
 
         <div class="card">
           <h2>Documentos</h2>
           <file-uploader @upload-complete="refreshDocuments" />
-          <document-list :documents="documents" @assign="showAssignmentModal" />
+          <document-list :documents="documents" @assign="openAssignmentModal" />
         </div>
       </section>
     </div>
@@ -48,10 +48,10 @@
     />
 
     <assignment-modal
-      v-if="showAssignmentModal"
+      v-if="isAssignmentModalVisible"
       :document="selectedDocument"
       :clients="clients"
-      @close="showAssignmentModal = false"
+      @close="closeAssignmentModal"
       @assigned="refreshDocuments"
     />
   </div>
@@ -79,12 +79,12 @@ import AssignmentModal from "@/components/modals/AssignmentModal.vue";
 const { isAuthenticated, user } = useAuth();
 const db = getFirestore();
 
-// Data
-const userRole = ref("client"); // 'admin' or 'client'
+// State
+const userRole = ref("client");
 const documents = ref([]);
 const clients = ref([]);
 const showUserModal = ref(false);
-const showAssignmentModal = ref(false);
+const isAssignmentModalVisible = ref(false);
 const selectedDocument = ref(null);
 
 // Computed
@@ -145,9 +145,14 @@ const refreshClients = () => {
   fetchClients();
 };
 
-const showAssignmentModal = (document) => {
+const openAssignmentModal = (document) => {
   selectedDocument.value = document;
-  showAssignmentModal.value = true;
+  isAssignmentModalVisible.value = true;
+};
+
+const closeAssignmentModal = () => {
+  isAssignmentModalVisible.value = false;
+  selectedDocument.value = null;
 };
 
 // Lifecycle
