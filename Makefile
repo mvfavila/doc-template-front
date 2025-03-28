@@ -64,7 +64,7 @@ serve-dev: build-dev
 .PHONY: clean
 clean:
 	@echo " Cleaning build artifacts..."
-	rm -rf dist node_modules
+	rm -rf dist node_modules package-lock.json .vite
 
 # Help
 .PHONY: help
