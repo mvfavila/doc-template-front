@@ -1,13 +1,14 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "@/views/Home.vue";
 import SignIn from "@/views/SignIn.vue";
+import { auth } from "@/firebase"; // Changed import
 
 const routes = [
   {
     path: "/",
     name: "Home",
     component: Home,
-    meta: { public: true }, // Accessible without auth
+    meta: { public: true },
   },
   {
     path: "/signin",
@@ -15,7 +16,12 @@ const routes = [
     component: SignIn,
     meta: { public: true },
   },
-  // Add your protected routes here...
+  {
+    path: "/dashboard",
+    name: "Dashboard",
+    component: () => import("@/views/Dashboard.vue"),
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({
@@ -23,15 +29,21 @@ const router = createRouter({
   routes,
 });
 
-// Optional: Add navigation guard for protected routes
-router.beforeEach((to, from, next) => {
-  const requiresAuth = !to.meta.public;
-  const isAuthenticated = /* your auth check logic */ false;
+router.beforeEach(async (to, from, next) => {
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
+  const isPublic = to.matched.some((record) => record.meta.public);
 
-  if (requiresAuth && !isAuthenticated) {
-    next("/signin");
-  } else {
+  if (requiresAuth) {
+    const user = auth.currentUser; // Now using the centralized auth instance
+    if (user) {
+      next();
+    } else {
+      next("/signin"); // Changed from '/login' to match your route
+    }
+  } else if (isPublic) {
     next();
+  } else {
+    next("/");
   }
 });
 

@@ -31,3 +31,6 @@ coverage
 
 # Confidential files
 confidential
+.env
+.env.dev
+.env.production

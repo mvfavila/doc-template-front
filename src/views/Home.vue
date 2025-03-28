@@ -1,16 +1,5 @@
 <template>
   <div class="home-page">
-    <header class="header">
-      <div class="logo">
-        <h1>Escritório Advogados Associados</h1>
-      </div>
-      <nav class="navigation">
-        <router-link to="/login" class="login-button"
-          >Área do Cliente</router-link
-        >
-      </nav>
-    </header>
-
     <main class="main-content">
       <section class="hero">
         <h2>Seu escritório jurídico digital</h2>
@@ -52,46 +41,13 @@
   font-family: "Arial", sans-serif;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  background-color: #2c3e50;
-  color: white;
-}
-
-.logo h1 {
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-.navigation {
-  display: flex;
-  gap: 1rem;
-}
-
-.login-button {
-  padding: 0.5rem 1rem;
-  background-color: #42b983;
-  color: white;
-  text-decoration: none;
-  border-radius: 4px;
-  transition: background-color 0.3s;
-}
-
-.login-button:hover {
-  background-color: #3aa876;
-}
-
 .main-content {
   flex: 1;
-  padding: 2rem;
 }
 
 .hero {
   text-align: center;
-  padding: 4rem 0;
+  padding: 4rem 2rem;
   background-color: #f5f5f5;
   margin-bottom: 2rem;
 }
@@ -99,6 +55,7 @@
 .hero h2 {
   font-size: 2.5rem;
   margin-bottom: 1rem;
+  color: #2c3e50;
 }
 
 .cta-button {
@@ -122,6 +79,9 @@
   justify-content: center;
   gap: 2rem;
   flex-wrap: wrap;
+  padding: 0 2rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .feature-card {
@@ -131,6 +91,7 @@
   border: 1px solid #ddd;
   border-radius: 8px;
   background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .footer {
