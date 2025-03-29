@@ -1,12 +1,12 @@
 import { ref } from "vue";
-import { firebase } from "@/firebase";
-import "firebase/compat/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 export const useAuth = () => {
   const isAuthenticated = ref(false);
   const isLoading = ref(true);
+  const auth = getAuth();
 
-  firebase.auth().onAuthStateChanged((user) => {
+  onAuthStateChanged(auth, (user) => {
     isAuthenticated.value = !!user;
     isLoading.value = false;
   });

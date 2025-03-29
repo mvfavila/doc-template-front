@@ -46,7 +46,7 @@
 
 <script setup>
 import { ref } from "vue";
-import { auth, firebase } from "@/firebase";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "vue-router";
 
 // Rate limiting variables
@@ -63,6 +63,7 @@ const attemptCount = ref(0);
 const lastAttemptTime = ref(null);
 
 const router = useRouter();
+const auth = getAuth();
 
 // Rate limiting cooldown timer
 let cooldownInterval;
@@ -100,7 +101,7 @@ const handleSignIn = async () => {
   error.value = "";
 
   try {
-    await firebase.auth().signInWithEmailAndPassword(auth, email.value, password.value);
+    await signInWithEmailAndPassword(auth, email.value, password.value);
     router.push("/dashboard");
   } catch (err) {
     switch (err.code) {
