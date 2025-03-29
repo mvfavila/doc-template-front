@@ -16,12 +16,11 @@
 
 <script setup>
 import { ref } from "vue";
-import { getStorage, ref as storageRef, uploadBytes } from "firebase/storage";
+import { storage } from "@/firebase";
 
 const emit = defineEmits(["upload-complete"]);
 const fileInput = ref(null);
 const uploading = ref(false);
-const storage = getStorage();
 
 const triggerFileInput = () => {
   fileInput.value.click();
@@ -33,8 +32,8 @@ const handleFileUpload = async (e) => {
 
   uploading.value = true;
   try {
-    const fileRef = storageRef(storage, `documents/${file.name}`);
-    await uploadBytes(fileRef, file);
+    const fileRef = storage.ref().child(`documents/${file.name}`);
+    await fileRef.put(file);
     emit("upload-complete");
   } catch (error) {
     console.error("Upload failed:", error);

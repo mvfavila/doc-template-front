@@ -55,9 +55,13 @@ serve-prod: build-prod
 	${NPM} install -g serve
 	serve -s dist
 
-serve-dev: build-dev
+serve-dev:
+	@echo " Switching to DEV project: ${DEV_PROJECT}"
+	${FIREBASE} use ${DEV_PROJECT}
+	@echo " Building for DEVELOPMENT..."
+	npm run build -- --mode development
 	@echo " Serving dev build locally..."
-	${NPM} install -g serve
+	npm install -g serve
 	serve -s dist
 
 # Cleanup
@@ -65,6 +69,7 @@ serve-dev: build-dev
 clean:
 	@echo " Cleaning build artifacts..."
 	rm -rf dist node_modules package-lock.json .vite
+	make install
 
 # Help
 .PHONY: help

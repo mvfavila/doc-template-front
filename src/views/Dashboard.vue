@@ -60,15 +60,8 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useAuth } from "@/composables/useAuth";
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  getDocs,
-} from "firebase/firestore";
+import { db } from "@/firebase";
 
-// Components
 import ClientList from "@/components/admin/ClientList.vue";
 import FileUploader from "@/components/admin/FileUploader.vue";
 import DocumentList from "@/components/admin/DocumentList.vue";
@@ -77,9 +70,7 @@ import UserCreationModal from "@/components/modals/UserCreationModal.vue";
 import AssignmentModal from "@/components/modals/AssignmentModal.vue";
 
 const { isAuthenticated, user } = useAuth();
-const db = getFirestore();
 
-// State
 const userRole = ref("client");
 const documents = ref([]);
 const clients = ref([]);
@@ -87,7 +78,6 @@ const showUserModal = ref(false);
 const isAssignmentModalVisible = ref(false);
 const selectedDocument = ref(null);
 
-// Computed
 const pendingDocuments = computed(() =>
   documents.value.filter((doc) => doc.status === "pending")
 );
@@ -96,10 +86,9 @@ const completedDocuments = computed(() =>
   documents.value.filter((doc) => doc.status !== "pending")
 );
 
-// Methods
+// Methods - Update Firestore queries to use compat syntax
 const fetchUserRole = async (uid) => {
-  const q = query(collection(db, "users"), where("uid", "==", uid));
-  const snapshot = await getDocs(q);
+  const snapshot = await db.collection("users").where("uid", "==", uid).get();
   if (!snapshot.empty) {
     userRole.value = snapshot.docs[0].data().role || "client";
   }
@@ -107,18 +96,16 @@ const fetchUserRole = async (uid) => {
 
 const fetchDocuments = async () => {
   if (userRole.value === "admin") {
-    const q = query(collection(db, "documents"));
-    const snapshot = await getDocs(q);
+    const snapshot = await db.collection("documents").get();
     documents.value = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
   } else {
-    const q = query(
-      collection(db, "documents"),
-      where("assignedTo", "==", user.value.uid)
-    );
-    const snapshot = await getDocs(q);
+    const snapshot = await db
+      .collection("documents")
+      .where("assignedTo", "==", user.value.uid)
+      .get();
     documents.value = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -127,13 +114,14 @@ const fetchDocuments = async () => {
 };
 
 const fetchClients = async () => {
-  const q = query(collection(db, "users"), where("role", "==", "client"));
-  const snapshot = await getDocs(q);
+  const snapshot = await db
+    .collection("users")
+    .where("role", "==", "client")
+    .get();
   clients.value = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 };
 
 const handleDocumentSubmit = (documentId) => {
-  // Update document status to 'submitted'
   console.log("Document submitted:", documentId);
 };
 
@@ -155,7 +143,6 @@ const closeAssignmentModal = () => {
   selectedDocument.value = null;
 };
 
-// Lifecycle
 onMounted(async () => {
   if (isAuthenticated.value && user.value) {
     await fetchUserRole(user.value.uid);
