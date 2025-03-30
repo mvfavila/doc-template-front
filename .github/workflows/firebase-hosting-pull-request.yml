@@ -11,6 +11,9 @@ jobs:
     environment: Dev
     steps:
       - uses: actions/checkout@v4
+      - run: |
+          echo "VITE_API_KEY=${{ secrets.VITE_API_KEY }}" >> .env
+          echo "VITE_AUTH_DOMAIN=${{ secrets.VITE_AUTH_DOMAIN }}" >> .env
       - run: npm ci && npm run build -- --mode dev  # Uses .env.dev
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
