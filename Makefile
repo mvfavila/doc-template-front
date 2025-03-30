@@ -48,7 +48,6 @@ deploy-dev: build-dev use-dev
 .PHONY: serve-prod serve-dev
 serve-prod: build-prod
 	@echo " Serving production build locally..."
-	${NPM} run build
 	${NPM} run preview
 
 serve-dev: build-dev

@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "@firebase/auth";
 
 export const useAuth = () => {
   const isAuthenticated = ref(false);

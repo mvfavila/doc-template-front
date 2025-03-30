@@ -66,7 +66,7 @@ import {
   query,
   where,
   getDocs,
-} from "firebase/firestore";
+} from "@firebase/firestore";
 
 // Components
 import ClientList from "@/components/admin/ClientList.vue";

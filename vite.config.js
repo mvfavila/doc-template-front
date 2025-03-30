@@ -14,9 +14,9 @@ export default defineConfig({
       "vue",
       "vue-router",
       "firebase/app",
-      "firebase/auth",
-      "firebase/firestore",
-      "firebase/storage",
+      "/firebase/auth",
+      "/firebase/firestore",
+      "/firebase/storage",
     ],
   },
   build: {
