@@ -45,20 +45,15 @@ deploy-dev: build-dev use-dev
 	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET_DEV}
 
 # Serve locally
-.PHONY: serve serve-prod serve-dev
-serve:
-	@echo " Starting local dev server..."
-	${NPM} run serve
-
+.PHONY: serve-prod serve-dev
 serve-prod: build-prod
 	@echo " Serving production build locally..."
-	${NPM} install -g serve
-	serve -s dist
+	${NPM} run build
+	${NPM} run preview
 
 serve-dev: build-dev
 	@echo " Serving dev build locally..."
-	${NPM} install -g serve
-	serve -s dist
+	${NPM} run dev
 
 # Cleanup
 .PHONY: clean
