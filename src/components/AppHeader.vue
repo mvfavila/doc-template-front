@@ -1,15 +1,19 @@
 <template>
-  <header class="app-header">
-    <router-link to="/" class="logo"> Escritório Advogados </router-link>
+  <header>
     <nav>
-      <template v-if="!isLoading">
-        <router-link v-if="!isAuthenticated" to="/signin" class="login-button">
-          Login
-        </router-link>
-        <router-link v-else to="/dashboard" class="dashboard-button">
-          Meu Painel
-        </router-link>
-      </template>
+      <router-link to="/dashboard" class="nav-button" v-if="isAuthenticated">
+        Meu Painel
+      </router-link>
+      <router-link to="/signin" class="nav-button" v-if="!isAuthenticated">
+        Login
+      </router-link>
+      <button
+        v-if="isAuthenticated"
+        @click="handleSignOut"
+        class="nav-button sign-out-button"
+      >
+        Sair
+      </button>
     </nav>
   </header>
 </template>
@@ -17,38 +21,41 @@
 <script setup>
 import { useAuth } from "@/composables/useAuth";
 
-const { isAuthenticated, isLoading } = useAuth();
+const { isAuthenticated, handleSignOut } = useAuth();
 </script>
 
 <style scoped>
-.app-header {
+/* Your existing styles remain the same */
+header {
+  background: #2c3e50;
+  padding: 1rem;
+}
+
+nav {
   display: flex;
-  justify-content: space-between;
+  gap: 1rem;
   align-items: center;
-  padding: 1rem 2rem;
-  background-color: #2c3e50;
-  color: white;
 }
 
-.logo {
+.nav-button {
   color: white;
   text-decoration: none;
-  font-weight: bold;
-  font-size: 1.2rem;
-}
-
-.login-button,
-.dashboard-button {
   padding: 0.5rem 1rem;
-  background-color: #42b983;
-  color: white;
-  text-decoration: none;
   border-radius: 4px;
   transition: background-color 0.3s;
 }
 
-.login-button:hover,
-.dashboard-button:hover {
-  background-color: #3aa876;
+.nav-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.sign-out-button {
+  background: none;
+  border: 1px solid white;
+  cursor: pointer;
+}
+
+.sign-out-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
 }
 </style>
