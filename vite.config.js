@@ -21,7 +21,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ["firebase/auth", "firebase/firestore", "firebase/storage"],
+      external: ["/firebase/auth", "/firebase/firestore", "/firebase/storage"],
     },
   },
   server: {
