@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { getAuth, onAuthStateChanged } from "@firebase/auth";
+import { getAuth, onAuthStateChanged, signOut } from "@firebase/auth";
 import { getFirestore, doc, getDoc } from "@firebase/firestore";
 
 export const useAuth = () => {
