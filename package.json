@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:component": "cypress run --component --config-file cypress.config.js --browser chrome --headed",
+    "test:component:open": "cypress open --component --config-file cypress.config.js"
   },
   "dependencies": {
     "@firebase/auth": "^1.9.1",
@@ -18,9 +20,18 @@
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
+    "@cypress/vite-dev-server": "^6.0.3",
+    "@cypress/vue": "^6.0.2",
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "@testing-library/vue": "^8.1.0",
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.4.6",
+    "cypress": "^14.2.1",
+    "firebase-tools": "^14.0.1",
+    "happy-dom": "^17.4.4",
     "path": "^0.12.7",
     "vite": "^6.2.1",
-    "vite-plugin-vue-devtools": "^7.7.2"
+    "vite-plugin-vue-devtools": "^7.7.2",
+    "vitest": "^3.0.9"
   }
 }

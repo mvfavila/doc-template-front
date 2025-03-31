@@ -39,5 +39,16 @@
         "confidential"
       ]
     }
-  ]
+  ],
+  "emulators": {
+    "auth": {
+      "port": 8080
+    },
+    "firestore": {
+      "port": 9099
+    },
+    "ui": {
+      "enabled": false
+    }
+  }
 }

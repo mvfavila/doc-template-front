@@ -1,0 +1,34 @@
+name: Test Suite
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      firebase-emulator:
+        image: ghcr.io/firebase/emulators
+        ports:
+          - 8080:8080 # Auth
+          - 9099:9099 # Firestore
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      
+      - run: npm ci
+      - run: npm install -g firebase-tools
+      
+      # Start emulators in background
+      - run: firebase emulators:start --only auth,firestore --project test-project &
+      
+      # Run tests
+      - run: npx cypress run --component --headless
+      - run: firebase emulators:exec --only firestore "vitest run tests/integration"
+      
+      # Store test results
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: cypress-screenshots
+          path: cypress/screenshots
