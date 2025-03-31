@@ -16,7 +16,7 @@
 
 <script setup>
 import { ref } from "vue";
-import { getStorage, ref as storageRef, uploadBytes } from "firebase/storage";
+import { getStorage, ref as storageRef, uploadBytes } from "@firebase/storage";
 
 const emit = defineEmits(["upload-complete"]);
 const fileInput = ref(null);
