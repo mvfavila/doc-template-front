@@ -1,15 +1,30 @@
 import { ref } from "vue";
-import { getAuth, onAuthStateChanged, signOut } from "@firebase/auth";
-import { useRouter } from "vue-router";
+import { getAuth, onAuthStateChanged } from "@firebase/auth";
+import { getFirestore, doc, getDoc } from "@firebase/firestore";
+
 export const useAuth = () => {
-  const router = useRouter();
+  const auth = getAuth();
+  const db = getFirestore();
+
+  const user = ref(null);
   const isAuthenticated = ref(false);
   const isLoading = ref(true);
-  const auth = getAuth();
   const isSigningOut = ref(false);
 
-  onAuthStateChanged(auth, (user) => {
-    isAuthenticated.value = !!user;
+  onAuthStateChanged(auth, async (firebaseUser) => {
+    if (firebaseUser) {
+      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+      user.value = {
+        ...firebaseUser,
+        role: userDoc.data()?.role,
+        officeId: userDoc.data()?.officeId,
+        isActive: userDoc.data()?.isActive,
+      };
+      isAuthenticated.value = true;
+    } else {
+      user.value = null;
+      isAuthenticated.value = false;
+    }
     isLoading.value = false;
   });
 
@@ -27,6 +42,7 @@ export const useAuth = () => {
   };
 
   return {
+    user,
     isAuthenticated,
     isLoading,
     handleSignOut,
