@@ -34,6 +34,9 @@
       <div v-if="error" class="error-message">
         {{ error }}
       </div>
+      <div v-if="authError" class="error-message">
+        Authentication error: {{ authError.message }}
+      </div>
 
       <div v-if="isRateLimited" class="rate-limit-message">
         Muitas tentativas. Tente novamente em {{ cooldownTime }} segundos.
@@ -48,6 +51,9 @@
 import { ref } from "vue";
 import { getAuth, signInWithEmailAndPassword } from "@firebase/auth";
 import { useRouter } from "vue-router";
+import { useAuth } from '@/composables/useAuth';
+
+const { authError } = useAuth();
 
 // Rate limiting variables
 const RATE_LIMIT_THRESHOLD = 5; // Max attempts
