@@ -16,7 +16,17 @@ interface CreateOfficeAdminData {
 
 export const createOfficeAdmin = https.onCall(async (request: CallableRequest<CreateOfficeAdminData>) => {
   // Verify system admin is making this request
-  if (!request.auth?.token.roles?.includes('system_admin')) {
+  if (!request.auth) {
+    throw new https.HttpsError(
+      'unauthenticated',
+      'You must be logged in to perform this action'
+    )
+  }
+
+  // Get the caller's user document
+  const userDoc = await db.doc(`users/${request.auth.uid}`).get()
+  
+  if (!userDoc.exists || userDoc.data()?.role !== 'system_admin') {
     throw new https.HttpsError(
       'permission-denied',
       'Only system admins can create office admins'
