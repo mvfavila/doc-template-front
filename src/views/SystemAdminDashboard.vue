@@ -99,6 +99,7 @@
   </template>
   
   <script setup>
+  import { getFunctions, httpsCallable } from 'firebase/functions'
   import { ref, computed, onMounted } from 'vue'
   import { 
     getFirestore, 
@@ -110,7 +111,7 @@
     updateDoc,
     doc
   } from '@firebase/firestore'
-  import { getAuth, createUserWithEmailAndPassword } from '@firebase/auth'
+  import { getAuth } from '@firebase/auth'
   
   const db = getFirestore()
   const auth = getAuth()
@@ -154,24 +155,28 @@
   const registerOfficeAdmin = async () => {
     try {
       isRegistering.value = true
-      const { user } = await createUserWithEmailAndPassword(
-        auth,
-        newOfficeAdmin.value.email,
-        newOfficeAdmin.value.password
-      )
       
-      await addDoc(collection(db, 'users'), {
+      // Initialize Cloud Functions
+      const functions = getFunctions()
+      
+      // Get reference to the Cloud Function
+      const createOfficeAdminFn = httpsCallable(functions, 'createOfficeAdmin')
+      
+      // Call the function
+      const result = await createOfficeAdminFn({
         email: newOfficeAdmin.value.email,
-        role: 'office_admin',
-        officeId: newOfficeAdmin.value.officeId,
-        isActive: true,
-        createdAt: new Date()
+        password: newOfficeAdmin.value.password,
+        officeId: newOfficeAdmin.value.officeId
       })
       
+      // Reset form on success
       newOfficeAdmin.value = { email: '', password: '', officeId: '' }
-      await fetchOfficeAdmins()
+      await fetchOfficeAdmins() // Refresh the admin list
+      
+      console.log('Office admin created:', result.data)
     } catch (error) {
-      console.error('Error registering admin:', error)
+      console.error('Error creating office admin:', error)
+      // You might want to show this error to the user
     } finally {
       isRegistering.value = false
     }
