@@ -25,7 +25,7 @@ install:
 	${NPM} install
 
 # Build commands
-.PHONY: build-prod build-dev
+.PHONY: build-prod build-dev build-functions
 build-prod: use-prod
 	@echo " Building for PRODUCTION..."
 	${NPM} run build -- --mode production
@@ -34,8 +34,12 @@ build-dev: use-dev
 	@echo " Building for DEVELOPMENT..."
 	${NPM} run build -- --mode development
 
+build-functions:
+	@echo " Build functions..."
+	npm --prefix 'functions' run build
+
 # Deployment commands
-.PHONY: deploy-prod deploy-dev
+.PHONY: deploy-prod deploy-dev deploy-functions
 deploy-prod: build-prod use-prod
 	@echo " Deploying to PRODUCTION (${PROD_PROJECT})..."
 	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET_PROD}
@@ -43,6 +47,10 @@ deploy-prod: build-prod use-prod
 deploy-dev: build-dev use-dev
 	@echo " Deploying to DEV (${DEV_PROJECT})..."
 	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET_DEV}
+
+deploy-functions:
+	@echo " Deploying functions..."
+	npm --prefix 'functions' run deploy
 
 # Serve locally
 .PHONY: serve-prod serve-dev
@@ -64,14 +72,16 @@ clean:
 .PHONY: help
 help:
 	@echo "Available commands:"
-	@echo "  make install       - Install dependencies"
-	@echo "  make build-prod    - Build production version"
-	@echo "  make build-dev     - Build development version"
-	@echo "  make deploy-prod   - Deploy to production"
-	@echo "  make deploy-dev    - Deploy to dev"
-	@echo "  make serve         - Start local dev server"
-	@echo "  make serve-prod    - Serve production build locally"
-	@echo "  make serve-dev     - Serve dev build locally"
-	@echo "  make clean         - Remove build artifacts"
-	@echo "  make use-prod      - Switch to production Firebase project"
-	@echo "  make use-dev       - Switch to dev Firebase project"
+	@echo "  make install           - Install dependencies"
+	@echo "  make build-prod        - Build production version"
+	@echo "  make build-dev         - Build development version"
+	@echo "  make build-functions   - Build cloud functions"
+	@echo "  make deploy-prod       - Deploy to production"
+	@echo "  make deploy-dev        - Deploy to dev"
+	@echo "  make deploy-functions  - Deploy cloud functions"
+	@echo "  make serve             - Start local dev server"
+	@echo "  make serve-prod        - Serve production build locally"
+	@echo "  make serve-dev         - Serve dev build locally"
+	@echo "  make clean             - Remove build artifacts"
+	@echo "  make use-prod          - Switch to production Firebase project"
+	@echo "  make use-dev           - Switch to dev Firebase project"
