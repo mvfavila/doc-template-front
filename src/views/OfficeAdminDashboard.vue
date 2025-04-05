@@ -254,7 +254,7 @@
   
   // Lifecycle
   onMounted(async () => {
-    // await fetchCustomers()
+    await fetchCustomers()
     // await fetchTemplates()
     // await fetchForms()
   })
