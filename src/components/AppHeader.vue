@@ -4,6 +4,20 @@
       <router-link to="/dashboard" class="nav-button" v-if="isAuthenticated">
         Meu Painel
       </router-link>
+      <router-link 
+        v-if="user?.role === 'office_admin'" 
+        to="/office-admin" 
+        class="nav-button"
+      >
+        Painel do Escritório
+      </router-link>
+      <router-link 
+        v-if="user?.role === 'system_admin'" 
+        to="/system-admin" 
+        class="nav-button"
+      >
+        Painel do Sistema
+      </router-link>
       <router-link to="/signin" class="nav-button" v-if="!isAuthenticated">
         Login
       </router-link>
@@ -21,7 +35,7 @@
 <script setup>
 import { useAuth } from "@/composables/useAuth";
 
-const { isAuthenticated, handleSignOut } = useAuth();
+const { user, isAuthenticated, handleSignOut } = useAuth();
 </script>
 
 <style scoped>

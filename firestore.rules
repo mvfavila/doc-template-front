@@ -2,32 +2,40 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
-      allow read, write: if isSystemAdmin();
+      allow read: if isSystemAdmin() || isOfficeAdmin() || isCustomer();
+      allow write: if isSystemAdmin();
+      allow create: if isOfficeAdmin()
+          && request.resource.data.role == 'customer';
     }
     
     match /offices/{officeId} {
-      allow read: if isSystemAdmin() || isOfficeAdmin(officeId);
+      allow read: if isSystemAdmin() || isSpecificOfficeAdmin(officeId);
       allow write: if isSystemAdmin();
     }
     
     match /templates/{templateId} {
-      allow read: if isOfficeAdmin(resource.data.officeId);
-      allow write: if isOfficeAdmin(request.resource.data.officeId);
+      allow read, write: if isSpecificOfficeAdmin(resource.data.officeId);
     }
     
     match /forms/{formId} {
-      allow read: if isOfficeAdmin(resource.data.officeId) || 
+      allow read: if isSpecificOfficeAdmin(resource.data.officeId) || 
                     (isCustomer() && resource.data.customerId == request.auth.uid);
-      allow update: if (isOfficeAdmin(resource.data.officeId) || 
+      allow update: if (isSpecificOfficeAdmin(resource.data.officeId) || 
                       (isCustomer() && resource.data.customerId == request.auth.uid && 
                        resource.data.status == "pending"));
+      allow create: if request.auth != null 
+                        && getUserData(request.auth.uid).role == 'office_admin';
     }
     
     function isSystemAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "system_admin";
     }
     
-    function isOfficeAdmin(officeId) {
+    function isOfficeAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "office_admin";
+    }
+    
+    function isSpecificOfficeAdmin(officeId) {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "office_admin" &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.officeId == officeId;
     }

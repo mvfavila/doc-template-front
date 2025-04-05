@@ -39,7 +39,7 @@ build-functions:
 	npm --prefix 'functions' run build
 
 # Deployment commands
-.PHONY: deploy-prod deploy-dev deploy-functions
+.PHONY: deploy-prod deploy-dev deploy-functions deploy-rules
 deploy-prod: build-prod use-prod
 	@echo " Deploying to PRODUCTION (${PROD_PROJECT})..."
 	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET_PROD}
@@ -51,6 +51,10 @@ deploy-dev: build-dev use-dev
 deploy-functions:
 	@echo " Deploying functions..."
 	npm --prefix 'functions' run deploy
+
+deploy-rules:
+	@echo " Deploying firestore rules..."
+	${FIREBASE} deploy --only firestore:rules
 
 # Serve locally
 .PHONY: serve-prod serve-dev
@@ -79,6 +83,7 @@ help:
 	@echo "  make deploy-prod       - Deploy to production"
 	@echo "  make deploy-dev        - Deploy to dev"
 	@echo "  make deploy-functions  - Deploy cloud functions"
+	@echo "  make deploy-rules	    - Deploy firestore rules"
 	@echo "  make serve             - Start local dev server"
 	@echo "  make serve-prod        - Serve production build locally"
 	@echo "  make serve-dev         - Serve dev build locally"

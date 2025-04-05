@@ -5,11 +5,6 @@ import { useAuth } from "@/composables/useAuth";
 
 const routes = [
   {
-    path: '/system-admin',
-    component: () => import('@/views/SystemAdminDashboard.vue'),
-    meta: { requiresAuth: true, roles: ['system_admin'] }
-  },
-  {
     path: "/",
     name: "Home",
     component: Home,
@@ -27,6 +22,18 @@ const routes = [
     component: () => import("@/views/Dashboard.vue"),
     meta: { requiresAuth: true },
   },
+  {
+    path: "/system-admin",
+    name: "SystemAdmin",
+    component: () => import("@/views/SystemAdminDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["system_admin"] },
+  },
+  {
+    path: "/office-admin",
+    name: "OfficeAdmin",
+    component: () => import("@/views/OfficeAdminDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["office_admin"] },
+  },
 ];
 
 const router = createRouter({
@@ -39,13 +46,13 @@ router.beforeEach(async (to, from, next) => {
 
   // Wait for auth to initialize
   while (isLoading.value) {
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
   if (to.meta.requiresAuth && !user.value) {
-    next('/signin');
+    next("/signin");
   } else if (to.meta.roles && !to.meta.roles.includes(user.value?.role)) {
-    next('/unauthorized');
+    next("/unauthorized");
   } else {
     next();
   }

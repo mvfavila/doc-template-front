@@ -1,1 +1,1 @@
-export { createOfficeAdmin } from './create-user'
+export { createUser } from './create-user'

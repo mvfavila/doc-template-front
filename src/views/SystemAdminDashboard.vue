@@ -160,13 +160,14 @@
       const functions = getFunctions()
       
       // Get reference to the Cloud Function
-      const createOfficeAdminFn = httpsCallable(functions, 'createOfficeAdmin')
+      const createUserFn = httpsCallable(functions, 'createUser')
       
       // Call the function
-      const result = await createOfficeAdminFn({
+      const result = await createUserFn({
         email: newOfficeAdmin.value.email,
         password: newOfficeAdmin.value.password,
-        officeId: newOfficeAdmin.value.officeId
+        officeId: newOfficeAdmin.value.officeId,
+        role: 'office_admin',
       })
       
       // Reset form on success
