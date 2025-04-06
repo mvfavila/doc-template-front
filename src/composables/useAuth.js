@@ -22,8 +22,6 @@ export const useAuth = () => {
         throw new Error("User document not found for UID: " + firebaseUser.uid);
       }
 
-      console.info("User data:", userDoc.data());
-
       user.value = {
         ...firebaseUser,
         role: userDoc.data()?.role,

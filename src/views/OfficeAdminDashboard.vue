@@ -123,6 +123,7 @@
     addDoc,
     updateDoc,
     doc,
+    getDoc,
     serverTimestamp
   } from 'firebase/firestore'
   import { getAuth, sendPasswordResetEmail } from 'firebase/auth'
@@ -172,9 +173,19 @@
   }
   
   const fetchTemplates = async () => {
-    const q = query(collection(db, 'templates'))
-    const snapshot = await getDocs(q)
-    templates.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const q = query(collection(db, 'templates'), where('officeId', '==', userDoc.data().officeId))
+          const snapshot = await getDocs(q)
+          templates.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error)
+    }
   }
   
   const fetchForms = async () => {
@@ -255,7 +266,7 @@
   // Lifecycle
   onMounted(async () => {
     await fetchCustomers()
-    // await fetchTemplates()
+    await fetchTemplates()
     // await fetchForms()
   })
   </script>
