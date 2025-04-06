@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "@/views/Home.vue";
 import SignIn from "@/views/SignIn.vue";
-import { auth } from "@/firebase";
+import { useAuth } from "@/composables/useAuth";
 
 const routes = [
   {
@@ -22,6 +22,18 @@ const routes = [
     component: () => import("@/views/Dashboard.vue"),
     meta: { requiresAuth: true },
   },
+  {
+    path: "/system-admin",
+    name: "SystemAdmin",
+    component: () => import("@/views/SystemAdminDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["system_admin"] },
+  },
+  {
+    path: "/office-admin",
+    name: "OfficeAdmin",
+    component: () => import("@/views/OfficeAdminDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["office_admin"] },
+  },
 ];
 
 const router = createRouter({
@@ -30,20 +42,19 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to, from, next) => {
-  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
-  const isPublic = to.matched.some((record) => record.meta.public);
+  const { user, isLoading } = useAuth();
 
-  if (requiresAuth) {
-    const user = auth.currentUser;
-    if (user) {
-      next();
-    } else {
-      next("/signin");
-    }
-  } else if (isPublic) {
-    next();
+  // Wait for auth to initialize
+  while (isLoading.value) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  if (to.meta.requiresAuth && !user.value) {
+    next("/signin");
+  } else if (to.meta.roles && !to.meta.roles.includes(user.value?.role)) {
+    next("/unauthorized");
   } else {
-    next("/");
+    next();
   }
 });
 
