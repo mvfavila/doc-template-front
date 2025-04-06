@@ -189,9 +189,19 @@
   }
   
   const fetchForms = async () => {
-    const q = query(collection(db, 'forms'))
-    const snapshot = await getDocs(q)
-    forms.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const q = query(collection(db, 'forms'), where('officeId', '==', userDoc.data().officeId))
+          const snapshot = await getDocs(q)
+          forms.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching forms:', error)
+    }
   }
   
   const toggleCustomerStatus = async (customerId, isActive) => {
@@ -267,7 +277,7 @@
   onMounted(async () => {
     await fetchCustomers()
     await fetchTemplates()
-    // await fetchForms()
+    await fetchForms()
   })
   </script>
   
