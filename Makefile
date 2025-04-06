@@ -72,6 +72,12 @@ clean:
 	@echo " Cleaning build artifacts..."
 	rm -rf dist node_modules package-lock.json .vite
 
+# Emulators
+.PHONY: run-emulators
+run-emulators:
+	@echo " Running emulators..."
+	${FIREBASE} emulators:start --project=${DEV_PROJECT} --only auth,firestore,functions
+
 # Help
 .PHONY: help
 help:
@@ -90,3 +96,4 @@ help:
 	@echo "  make clean             - Remove build artifacts"
 	@echo "  make use-prod          - Switch to production Firebase project"
 	@echo "  make use-dev           - Switch to dev Firebase project"
+	@echo "  make run-emulators     - Run emulators for dev"

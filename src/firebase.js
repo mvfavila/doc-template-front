@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "@firebase/auth";
-import { getFirestore } from "@firebase/firestore";
+import { getAuth, connectAuthEmulator } from "@firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "@firebase/firestore";
 import { getStorage } from "@firebase/storage";
+import { getFunctions, connectFunctionsEmulator } from "@firebase/functions";
 
 // Initialize Firebase first
 const firebaseConfig = {
@@ -13,9 +14,20 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
-
 // Initialize services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+const functions = getFunctions(app);
+
+// Connect to emulators in development
+if (import.meta.env.DEV) { // or process.env.NODE_ENV === 'development'
+  connectAuthEmulator(auth, "http://localhost:9099");
+  connectFirestoreEmulator(db, "localhost", 8080);
+  connectFunctionsEmulator(functions, "localhost", 5001);
+  
+  console.log("Connected to local emulators");
+}
+
+export { auth, db, storage, functions };

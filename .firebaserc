@@ -1,6 +1,6 @@
 {
   "projects": {
-    "default": "doc-template-front",
+    "default": "doc-template-front-dev",
     "production": "doc-template-front",
     "dev": "doc-template-front-dev"
   },
