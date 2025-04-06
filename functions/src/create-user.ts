@@ -8,6 +8,13 @@ const app = initializeApp()
 const auth = getAuth(app)
 const db = getFirestore(app)
 
+if (process.env.FUNCTIONS_EMULATOR === 'true') {
+  // For Admin SDK, we set the environment variables directly
+  process.env.FIREBASE_AUTH_EMULATOR_HOST = "localhost:9099";
+  process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+  logger.info("Connected to emulators");
+}
+
 interface CreateUserData {
   name: string
   email: string

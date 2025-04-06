@@ -57,20 +57,34 @@ deploy-rules:
 	${FIREBASE} deploy --only firestore:rules
 
 # Serve locally
-.PHONY: serve-prod serve-dev
+.PHONY: serve-prod serve-dev serve-dev-emulators
 serve-prod: build-prod
 	@echo " Serving production build locally..."
 	${NPM} run preview
 
 serve-dev: build-dev
 	@echo " Serving dev build locally..."
-	${NPM} run dev
+	${NPM} run dev:live
+
+serve-dev-emulators: build-dev
+	@echo " Serving dev build locally (with emulators)..."
+	${NPM} run dev:emulators
 
 # Cleanup
 .PHONY: clean
 clean:
 	@echo " Cleaning build artifacts..."
 	rm -rf dist node_modules package-lock.json .vite
+
+# Emulators
+.PHONY: run-emulators export-data
+run-emulators:
+	@echo " Running emulators..."
+	${FIREBASE} emulators:start --project=${DEV_PROJECT} --only auth,firestore,functions --import ./emulator-data
+
+export-data:
+	@echo " Export data from emulators..."
+	${FIREBASE} emulators:export ./emulator-data
 
 # Help
 .PHONY: help
@@ -90,3 +104,5 @@ help:
 	@echo "  make clean             - Remove build artifacts"
 	@echo "  make use-prod          - Switch to production Firebase project"
 	@echo "  make use-dev           - Switch to dev Firebase project"
+	@echo "  make run-emulators     - Run emulators for dev"
+	@echo "  make export-data       - Export data from emulators"
