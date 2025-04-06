@@ -31,7 +31,7 @@
                 <td>
                   <button @click="toggleCustomerStatus(customer.id, !customer.isActive)" 
                           :class="{ 'warning': customer.isActive }">
-                    {{ customer.isActive ? 'Desativar' : 'Ativar' }}
+                    {{ customer.isActive ? 'Bloquear' : 'Desbloquear' }}
                   </button>
                   <button @click="initiatePasswordReset(customer.id)" class="reset-button">
                     Resetar Senha

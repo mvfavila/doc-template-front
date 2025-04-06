@@ -8,6 +8,10 @@
           <h2>Registrar Novo Administrador de Escritório</h2>
           <form @submit.prevent="registerOfficeAdmin">
             <div class="form-group">
+              <label>Nome Completo</label>
+              <input v-model="newOfficeAdmin.name" required />
+            </div>
+            <div class="form-group">
               <label>E-mail</label>
               <input v-model="newOfficeAdmin.email" type="email" required>
             </div>
@@ -38,6 +42,7 @@
           <table class="admin-table">
             <thead>
               <tr>
+                <th>Nome</th>
                 <th>E-mail</th>
                 <th>Escritório</th>
                 <th>Status</th>
@@ -46,6 +51,7 @@
             </thead>
             <tbody>
               <tr v-for="admin in filteredAdmins" :key="admin.id">
+                <td>{{ admin.name }}</td>
                 <td>{{ admin.email }}</td>
                 <td>{{ getOfficeName(admin.officeId) }}</td>
                 <td>{{ admin.isActive ? 'Ativo' : 'Bloqueado' }}</td>
@@ -54,7 +60,7 @@
                     @click="toggleAdminStatus(admin.id, !admin.isActive)"
                     :class="{ 'warning': admin.isActive }"
                   >
-                    {{ admin.isActive ? 'Bloquear' : 'Ativar' }}
+                    {{ admin.isActive ? 'Bloquear' : 'Desbloquear' }}
                   </button>
                 </td>
               </tr>
@@ -120,6 +126,7 @@
   const offices = ref([])
   const officeAdmins = ref([])
   const newOfficeAdmin = ref({
+    name: '',
     email: '',
     password: '',
     officeId: ''
@@ -167,11 +174,12 @@
         email: newOfficeAdmin.value.email,
         password: newOfficeAdmin.value.password,
         officeId: newOfficeAdmin.value.officeId,
+        name: newOfficeAdmin.value.name,
         role: 'office_admin',
       })
       
       // Reset form on success
-      newOfficeAdmin.value = { email: '', password: '', officeId: '' }
+      newOfficeAdmin.value = { name: '', email: '', password: '', officeId: '' }
       await fetchOfficeAdmins() // Refresh the admin list
       
       console.log('Office admin created:', result.data)

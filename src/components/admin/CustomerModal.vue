@@ -108,7 +108,7 @@ const registerCustomer = async () => {
     });
 
     // Reset form on success
-    newCustomer.value = { email: "", password: "", officeId: "" };
+    newCustomer.value = { name: "", email: "", password: "", officeId: "" };
     await fetchCustomers(); // Refresh the customer list
 
     console.log("customer created:", result.data);
