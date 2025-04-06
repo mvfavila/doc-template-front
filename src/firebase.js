@@ -22,7 +22,7 @@ const storage = getStorage(app);
 const functions = getFunctions(app);
 
 // Connect to emulators in development
-if (import.meta.env.DEV) { // or process.env.NODE_ENV === 'development'
+if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true') {
   connectAuthEmulator(auth, "http://localhost:9099");
   connectFirestoreEmulator(db, "localhost", 8080);
   connectFunctionsEmulator(functions, "localhost", 5001);

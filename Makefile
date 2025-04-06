@@ -57,14 +57,18 @@ deploy-rules:
 	${FIREBASE} deploy --only firestore:rules
 
 # Serve locally
-.PHONY: serve-prod serve-dev
+.PHONY: serve-prod serve-dev serve-dev-emulators
 serve-prod: build-prod
 	@echo " Serving production build locally..."
 	${NPM} run preview
 
 serve-dev: build-dev
 	@echo " Serving dev build locally..."
-	${NPM} run dev
+	${NPM} run dev:live
+
+serve-dev-emulators: build-dev
+	@echo " Serving dev build locally (with emulators)..."
+	${NPM} run dev:emulators
 
 # Cleanup
 .PHONY: clean
