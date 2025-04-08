@@ -19,7 +19,6 @@
     "@firebase/storage": "^0.13.7",
     "date-fns": "^4.1.0",
     "firebase": "^11.5.0",
-    "jsdom": "^26.0.0",
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
