@@ -3,9 +3,11 @@
     <h1>Login - Escritório de Advocacia</h1>
     <form @submit.prevent="handleSignIn">
       <div class="form-group">
-        <label>E-mail</label>
+        <label for="email">E-mail</label>
         <input
+          id="email"
           v-model="email"
+          aria-label="E-mail"
           type="email"
           required
           :disabled="isLoading || isRateLimited"
@@ -13,9 +15,11 @@
       </div>
 
       <div class="form-group">
-        <label>Senha</label>
+        <label for="password">Senha</label>
         <input
+          id="password"
           v-model="password"
+          aria-label="Senha"
           type="password"
           required
           :disabled="isLoading || isRateLimited"
@@ -51,7 +55,7 @@
 import { ref } from "vue";
 import { getAuth, signInWithEmailAndPassword } from "@firebase/auth";
 import { useRouter } from "vue-router";
-import { useAuth } from '@/composables/useAuth';
+import { useAuth } from "@/composables/useAuth";
 
 const { authError } = useAuth();
 
