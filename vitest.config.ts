@@ -13,11 +13,7 @@ export default defineConfig({
     },
     server: {
       deps: {
-        inline: [
-          '@vue',
-          'firebase',
-          '@firebase/auth'
-        ]
+        inline: ['@vue', 'firebase']
       }
     }
   }
