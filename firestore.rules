@@ -43,5 +43,9 @@ service cloud.firestore {
     function isCustomer() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "customer";
     }
+    
+    function getUserData(id) {
+      return get(/databases/$(database)/documents/users/$(id)).data;
+    }
   }
 }
