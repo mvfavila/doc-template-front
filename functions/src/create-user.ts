@@ -73,8 +73,7 @@ export const createUser = https.onCall(async (request: CallableRequest<CreateUse
 
     await auth.setCustomUserClaims(userRecord.uid, {
       role: role,
-      officeId: officeId,
-      email_verified: true
+      officeId: officeId
     });
 
     logger.log('Auth user created successfully', { uid: userRecord.uid })
