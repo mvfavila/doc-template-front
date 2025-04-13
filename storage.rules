@@ -1,19 +1,18 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Block all public access by default
-    match /{allPaths=**} {
-      allow read, write: if false;
-    }
-
     // Templates path with strict admin access control
     match /templates/{officeId}/{templateFile} {
-      allow write: if request.auth != null &&
-                   isSpecificOfficeAdmin(officeId) && 
+      allow write: if isSpecificOfficeAdmin(officeId) && 
                    isValidDocx() &&
                    isUpToSizeLimit(5);
       
       allow read, delete: if isSpecificOfficeAdmin(officeId);
+    }
+
+    // Block all public access by default
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }
@@ -21,8 +20,9 @@ service firebase.storage {
 // Helper functions
     
 function isSpecificOfficeAdmin(officeId) {
-  return request.auth.token.role == "office_admin" &&
-         request.auth.token.officeId == officeId;
+  return request.auth != null &&
+        request.auth.token.role == "office_admin" &&
+        request.auth.token.officeId == officeId;
 }
 
 function isValidDocx() {

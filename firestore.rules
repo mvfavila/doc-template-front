@@ -14,7 +14,8 @@ service cloud.firestore {
     }
     
     match /templates/{templateId} {
-      allow read, write: if isSpecificOfficeAdmin(resource.data.officeId);
+      allow write: if isOfficeAdmin();
+      allow read: if isSpecificOfficeAdmin(resource.data.officeId);
     }
     
     match /forms/{formId} {
@@ -28,20 +29,24 @@ service cloud.firestore {
     }
     
     function isSystemAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "system_admin";
+      return request.auth != null &&
+            request.auth.token.role == "system_admin";
     }
     
     function isOfficeAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "office_admin";
+      return request.auth != null &&
+            request.auth.token.role == "office_admin";
     }
     
     function isSpecificOfficeAdmin(officeId) {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "office_admin" &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.officeId == officeId;
+      return request.auth != null &&
+            request.auth.token.role == "office_admin" &&
+            request.auth.token.officeId == officeId;
     }
     
     function isCustomer() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "customer";
+      return request.auth != null &&
+            request.auth.token.role == "customer";
     }
     
     function getUserData(id) {
