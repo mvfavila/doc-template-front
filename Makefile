@@ -49,6 +49,7 @@ deploy-dev: build-dev use-dev
 	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET_DEV}
 
 deploy-functions:
+	make build-functions
 	@echo " Deploying functions..."
 	npm --prefix 'functions' run deploy
 
@@ -80,7 +81,7 @@ clean:
 .PHONY: run-emulators export-data
 run-emulators:
 	@echo " Running emulators..."
-	${FIREBASE} emulators:start --project=${DEV_PROJECT} --only auth,firestore,functions --import ./emulator-data
+	${FIREBASE} emulators:start --project=${DEV_PROJECT} --only auth,firestore,functions,storage --import ./emulator-data
 
 export-data:
 	@echo " Export data from emulators..."
