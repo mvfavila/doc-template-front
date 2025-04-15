@@ -41,7 +41,7 @@ export const createUser = https.onCall(async (request: CallableRequest<CreateUse
   // Get the caller's user document
   const userDoc = await db.doc(`users/${request.auth.uid}`).get()
   
-  if (!userDoc.exists || (userDoc.data()?.role !== 'system_admin' && userDoc.data()?.role !== 'office_admin')) {
+  if (!userDoc.exists || (request.auth.token.role !== 'system_admin' && request.auth.token.role !== 'office_admin')) {
     logger.warn('Permission denied - invalid role for user creation', { uid: request.auth.uid })
     // Only system admins or office admins can create users
     throw new https.HttpsError(
@@ -50,10 +50,10 @@ export const createUser = https.onCall(async (request: CallableRequest<CreateUse
     )
   }
 
-  if ((role === 'customer' && userDoc.data()?.role !== 'office_admin') || (role === 'office_admin' && userDoc.data()?.role !== 'system_admin')) {
+  if ((role === 'customer' && request.auth.token.role !== 'office_admin') || (role === 'office_admin' && request.auth.token.role !== 'system_admin')) {
     logger.warn('Permission denied - insufficient privileges for requested role', {
       uid: request.auth.uid,
-      callerRole: userDoc.data()?.role,
+      callerRole: request.auth.token.role,
       requestedRole: role
     })
     throw new https.HttpsError(
@@ -70,6 +70,11 @@ export const createUser = https.onCall(async (request: CallableRequest<CreateUse
       email,
       password,
     })
+
+    await auth.setCustomUserClaims(userRecord.uid, {
+      role: role,
+      officeId: officeId
+    });
 
     logger.log('Auth user created successfully', { uid: userRecord.uid })
 
