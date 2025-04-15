@@ -1,19 +1,7 @@
-import { https, logger } from 'firebase-functions'
-import { initializeApp } from 'firebase-admin/app'
-import { getAuth } from 'firebase-admin/auth'
-import { getFirestore, FieldValue } from 'firebase-admin/firestore'
-import { CallableRequest } from 'firebase-functions/v2/https'
-
-const app = initializeApp()
-const auth = getAuth(app)
-const db = getFirestore(app)
-
-if (process.env.FUNCTIONS_EMULATOR === 'true') {
-  // For Admin SDK, we set the environment variables directly
-  process.env.FIREBASE_AUTH_EMULATOR_HOST = "localhost:9099";
-  process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
-  logger.info("Connected to emulators");
-}
+import { https, logger } from 'firebase-functions';
+import { CallableRequest } from 'firebase-functions/v2/https';
+import { auth, db } from './shared/firebase-admin'; // Import from shared file
+import { FieldValue } from 'firebase-admin/firestore';
 
 interface CreateUserData {
   name: string

@@ -28,6 +28,10 @@ service cloud.firestore {
                         && getUserData(request.auth.uid).role == 'office_admin';
     }
     
+    match /admins/{uid} {
+      allow read, write: if false; // should never be changed
+    }
+    
     function isSystemAdmin() {
       return request.auth != null &&
             request.auth.token.role == "system_admin";
