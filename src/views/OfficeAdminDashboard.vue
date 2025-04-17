@@ -175,6 +175,7 @@ import {
   doc,
   getDoc,
   serverTimestamp,
+  onSnapshot,
 } from "firebase/firestore";
 import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 import {
@@ -214,6 +215,8 @@ const uploadInProgress = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
 
+let unsubscribeTemplates = null;
+
 // Computed
 const filteredCustomers = computed(() => {
   return customers.value.filter(
@@ -237,7 +240,7 @@ const fetchCustomers = async () => {
   customers.value = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 };
 
-const fetchTemplates = async () => {
+const setupTemplateListener = async () => {
   try {
     const user = auth.currentUser;
     if (user) {
@@ -247,15 +250,24 @@ const fetchTemplates = async () => {
           collection(db, "templates"),
           where("officeId", "==", userDoc.data().officeId)
         );
-        const snapshot = await getDocs(q);
-        templates.value = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        
+        unsubscribeTemplates = onSnapshot(q, 
+          (snapshot) => {
+            templates.value = snapshot.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            }));
+            templates.value.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds);
+          },
+          (error) => {
+            console.error("Template listener error:", error);
+            errorMessage.value = "Erro ao sincronizar templates";
+          }
+        );
       }
     }
   } catch (error) {
-    console.error("Error fetching templates:", error);
+    console.error("Error setting up template listener:", error);
     errorMessage.value = "Erro ao carregar templates";
   }
 };
@@ -393,7 +405,6 @@ const uploadTemplate = async () => {
           successMessage.value =
             "Template enviado com sucesso! O processamento começará em breve.";
           resetUploadForm();
-          await fetchTemplates();
         } catch (error) {
           if (error.code === 'storage/unauthorized') {
             errorMessage.value = "Você não tem permissão para enviar templates. Contate o administrador.";
@@ -459,7 +470,7 @@ const refreshForms = async () => {
 // Lifecycle
 onMounted(async () => {
   await fetchCustomers();
-  await fetchTemplates();
+  await setupTemplateListener();
   await fetchForms();
 });
 </script>
