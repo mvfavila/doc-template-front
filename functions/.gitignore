@@ -2,3 +2,15 @@ node_modules/
 *.local
 confidential
 lib/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+pyvenv.cfg
+functions/python/lib/
+python_deploy
+venv
+.requirements.lock
