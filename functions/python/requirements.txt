@@ -1,0 +1,5 @@
+firebase-functions
+firebase-admin
+python-docx
+docx2pdf
+google-cloud-storage

@@ -29,14 +29,30 @@
   "functions": [
     {
       "source": "functions",
-      "codebase": "default",
+      "codebase": "typescript",
+      "runtime": "nodejs22",
       "ignore": [
         "node_modules",
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
         "*.local",
-        "confidential"
+        "confidential",
+        "python"
+      ]
+    },
+    {
+      "source": "functions/python",
+      "codebase": "python",
+      "runtime": "python310",
+      "ignore": [
+        "**/__pycache__",
+        "*.py[cod]",
+        "*$py.class",
+        "*.so",
+        ".Python",
+        "pyvenv.cfg",
+        "lib"
       ]
     }
   ],
@@ -45,7 +61,11 @@
       "port": 9099
     },
     "functions": {
-      "port": 5001
+      "port": 5001,
+      "runtime": {
+        "typescript": "nodejs16",
+        "python": "python310"
+      }
     },
     "firestore": {
       "port": 8080
