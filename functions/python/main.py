@@ -53,14 +53,14 @@ def processtemplate(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) ->
             # 3. Update the template document with the placeholders
             snapshot.reference.update({
                 "placeholders": placeholders,
-                "status": "ready_for_data"
+                "status": "processed"
             })
             print("Template processed successfully")
 
     except Exception as error:
         print(f"Error processing template: {error}")
         snapshot.reference.update({
-            "status": "error",
+            "status": "failed",
             "error": str(error)
         })
         raise
