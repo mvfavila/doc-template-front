@@ -118,9 +118,20 @@
 
       <div v-if="showPlaceholderModal" class="modal-overlay">
         <div class="modal-content">
-          <h3>Configurar Máscaras de Placeholders</h3>
+          <h3>Configurar modelo de documento</h3>
           <div v-for="(placeholder, key) in currentPlaceholders" :key="key" class="placeholder-item">
             <h4>{{ key }}</h4>
+            <div class="config-row">
+              <label>Apelido:</label>
+              <input 
+                v-model="placeholder.alias" 
+                type="text" 
+                placeholder="Nome amigável para exibição"
+                maxlength="100"
+                @input="validateFieldLength($event, 'alias', 100)"
+              />
+              <span class="char-counter">{{ placeholder.alias?.length || 0 }}/100</span>
+            </div>
             <div class="config-row">
               <label>Tipo:</label>
               <select v-model="placeholder.type">
@@ -133,7 +144,7 @@
                 <option value="phone">Telefone</option>
               </select>
             </div>
-            <div class="config-row">
+            <div class="config-row checkbox-row">
               <label>
                 <input type="checkbox" v-model="placeholder.required">
                 Obrigatório
@@ -513,9 +524,9 @@ onMounted(async () => {
 // Add these new data properties
 const showPlaceholderModal = ref(false);
 const currentTemplate = ref(null);
-const currentPlaceholders = ref({});
+const currentPlaceholders = ref<Placeholders>({});
 
-const editPlaceholderMasks = (template: any) => {
+const editPlaceholderMasks = (template: { placeholders?: Placeholders }) => {
   currentTemplate.value = template;
   currentPlaceholders.value = template.placeholders 
     ? JSON.parse(JSON.stringify(template.placeholders))
@@ -525,6 +536,12 @@ const editPlaceholderMasks = (template: any) => {
 
 const savePlaceholderConfig = async () => {
   try {
+    for (const [key, placeholder] of Object.entries(currentPlaceholders.value)) {
+      if (placeholder.alias && placeholder.alias.length > MAX_FIELD_LENGTH) {
+        throw new Error(`O alias para ${key} excede o limite de ${MAX_FIELD_LENGTH} caracteres`);
+      }
+    }
+
     await updateDoc(doc(db, "templates", currentTemplate.value.id), {
       placeholders: currentPlaceholders.value
     });
@@ -534,6 +551,26 @@ const savePlaceholderConfig = async () => {
   } catch (error) {
     errorMessage.value = "Erro ao salvar configurações: " + (error as Error).message;
     console.error("Error saving placeholder config:", error);
+  }
+};
+
+const MAX_FIELD_LENGTH = 100;
+
+const validateFieldLength = (event: Event, field: string, maxLength: number) => {
+  const target = event.target as HTMLInputElement;
+  const value = target.value;
+  
+  if (value.length > maxLength) {
+    errorMessage.value = `${field} não pode exceder ${maxLength} caracteres`;
+    target.value = value.substring(0, maxLength);
+    // Force Vue to update the model
+    if (currentPlaceholders.value) {
+      for (const key in currentPlaceholders.value) {
+        if (currentPlaceholders.value[key][field]) {
+          currentPlaceholders.value[key][field] = currentPlaceholders.value[key][field].substring(0, maxLength);
+        }
+      }
+    }
   }
 };
 </script>
@@ -695,6 +732,15 @@ button.reset-button {
   .template-upload {
     flex-direction: column;
   }
+
+  .modal-content {
+    padding: 1.5rem;
+    width: 95%;
+  }
+  
+  .placeholder-item {
+    padding: 1rem;
+  }
 }
 
 .upload-section {
@@ -799,36 +845,38 @@ button.reset-button {
   background: white;
   padding: 2rem;
   border-radius: 8px;
-  max-width: 600px;
   width: 90%;
-  max-height: 80vh;
+  max-width: 700px;
+  max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-sizing: border-box;
+}
+
+.modal-content h3 {
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
 }
 
 .placeholder-item {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  padding: 1rem;
-  border: 1px solid #eee;
-  border-radius: 4px;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #f9f9f9;
+  box-sizing: border-box;
 }
 
 .placeholder-item h4 {
-  grid-column: span 2;
-  margin-top: 0;
-  margin-bottom: 0.5rem;
-}
-
-@media (max-width: 600px) {
-  .placeholder-item {
-    grid-template-columns: 1fr;
-  }
-  
-  .placeholder-item h4 {
-    grid-column: span 1;
-  }
+  font-family: monospace;
+  background: #f0f0f0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 0.9rem;
 }
 
 .validation-options {
@@ -862,41 +910,108 @@ button.reset-button {
   justify-content: flex-end;
   gap: 1rem;
   margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
 }
 
 .save-button {
   background-color: #42b983;
   color: white;
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1.2rem;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
 }
 
 .cancel-button {
-  background-color: #e74c3c;
-  color: white;
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
+  background-color: #f5f5f5;
+  color: #666;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
   cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.cancel-button:hover {
+  background-color: #eee;
+  border-color: #ccc;
 }
 
 .config-row {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0.5rem 0;
+  flex-direction: column;
+  margin-bottom: 1rem;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.config-row input[type="text"],
+.config-row select {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  width: 100%;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.config-row input[type="text"]:focus,
+.config-row select:focus {
+  outline: none;
+  border-color: #42b983;
+  box-shadow: 0 0 0 2px rgba(66, 185, 131, 0.2);
 }
 
 .config-row label {
-  min-width: 80px;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #444;
+  font-size: 0.9rem;
 }
 
-.config-row select {
-  flex-grow: 1;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+.config-row:last-child {
+  margin-bottom: 0;
+}
+
+.config-row input:invalid {
+  border-color: #e74c3c;
+}
+
+.config-row input[type="checkbox"] {
+  margin-right: 0.5rem;
+}
+
+.config-row.checkbox-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+.config-row.checkbox-row label {
+  margin-bottom: 0;
+  font-weight: normal;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.config-row.checkbox-row input[type="checkbox"] {
+  width: auto;
+  margin-right: 0.5rem;
+}
+
+.char-counter {
+  font-size: 0.75rem;
+  color: #777;
+  text-align: right;
+  margin-top: 0.25rem;
+}
+
+.save-button:hover {
+  background-color: #3aa876;
 }
 </style>

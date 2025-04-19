@@ -54,6 +54,7 @@ def processtemplate(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) ->
                 p: {
                     "type": "long_text",
                     "required": True,
+                    "alias": p.replace('_', ' ').title()
                 } for p in placeholders
             }
 
