@@ -50,9 +50,16 @@ def processtemplate(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) ->
             placeholders = extract_placeholders(temp_path)
             print(f"Found placeholders: {placeholders}")
 
+            placeholder_config = {
+                p: {
+                    "type": "long_text",
+                    "required": True,
+                } for p in placeholders
+            }
+
             # 3. Update the template document with the placeholders
             snapshot.reference.update({
-                "placeholders": placeholders,
+                "placeholders": placeholder_config,
                 "status": "processed"
             })
             print("Template processed successfully")

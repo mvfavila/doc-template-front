@@ -91,22 +91,58 @@
         </div>
 
         <div class="templates-list">
-          <div
-            v-for="template in templates"
-            :key="template.id"
-            class="template-item"
-          >
+          <div v-for="template in templates" :key="template.id" class="template-item">
             <h3>{{ template.name }}</h3>
             <p v-if="template.status" :class="`status-${template.status}`">
               Status: {{ formatStatus(template.status) }}
             </p>
-            <button
-              @click="assignTemplate(template)"
-              :disabled="template.status !== 'processed'"
-              class="assign-button"
-            >
-              Atribuir a Clientes
-            </button>
+            <div class="template-actions">
+              <button
+                @click="assignTemplate(template)"
+                :disabled="template.status !== 'processed'"
+                class="assign-button"
+              >
+                Atribuir a Clientes
+              </button>
+              <button
+                v-if="template.status === 'processed' && template.placeholders"
+                @click="editPlaceholderMasks(template)"
+                class="edit-button"
+              >
+                Configurar Placeholders
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="showPlaceholderModal" class="modal-overlay">
+        <div class="modal-content">
+          <h3>Configurar Máscaras de Placeholders</h3>
+          <div v-for="(placeholder, key) in currentPlaceholders" :key="key" class="placeholder-item">
+            <h4>{{ key }}</h4>
+            <div class="config-row">
+              <label>Tipo:</label>
+              <select v-model="placeholder.type">
+                <option value="long_text">Texto Longo (até 1000 caracteres)</option>
+                <option value="short_text">Texto Curto (até 100 caracteres)</option>
+                <option value="name">Nome (somente letras)</option>
+                <option value="cpf">CPF</option>
+                <option value="cnpj">CNPJ</option>
+                <option value="email">E-mail</option>
+                <option value="phone">Telefone</option>
+              </select>
+            </div>
+            <div class="config-row">
+              <label>
+                <input type="checkbox" v-model="placeholder.required">
+                Obrigatório
+              </label>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button @click="savePlaceholderConfig" class="save-button">Salvar</button>
+            <button @click="showPlaceholderModal = false" class="cancel-button">Cancelar</button>
           </div>
         </div>
       </div>
@@ -473,6 +509,33 @@ onMounted(async () => {
   await setupTemplateListener();
   await fetchForms();
 });
+
+// Add these new data properties
+const showPlaceholderModal = ref(false);
+const currentTemplate = ref(null);
+const currentPlaceholders = ref({});
+
+const editPlaceholderMasks = (template: any) => {
+  currentTemplate.value = template;
+  currentPlaceholders.value = template.placeholders 
+    ? JSON.parse(JSON.stringify(template.placeholders))
+    : {};
+  showPlaceholderModal.value = true;
+};
+
+const savePlaceholderConfig = async () => {
+  try {
+    await updateDoc(doc(db, "templates", currentTemplate.value.id), {
+      placeholders: currentPlaceholders.value
+    });
+    showPlaceholderModal.value = false;
+    successMessage.value = "Configurações de placeholders salvas com sucesso!";
+    setTimeout(() => successMessage.value = "", 3000);
+  } catch (error) {
+    errorMessage.value = "Erro ao salvar configurações: " + (error as Error).message;
+    console.error("Error saving placeholder config:", error);
+  }
+};
 </script>
 
 <style scoped>
@@ -717,5 +780,72 @@ button.reset-button {
 .assign-button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.placeholder-item {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.placeholder-item h4 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.placeholder-item select {
+  width: 100%;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.validation-options {
+  margin-top: 0.5rem;
+}
+
+.validation-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.template-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.edit-button {
+  background-color: #f39c12;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 0.5rem;
 }
 </style>
