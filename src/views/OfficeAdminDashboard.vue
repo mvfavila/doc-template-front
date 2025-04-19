@@ -806,6 +806,9 @@ button.reset-button {
 }
 
 .placeholder-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
   margin-bottom: 1rem;
   padding: 1rem;
   border: 1px solid #eee;
@@ -813,14 +816,19 @@ button.reset-button {
 }
 
 .placeholder-item h4 {
+  grid-column: span 2;
   margin-top: 0;
   margin-bottom: 0.5rem;
 }
 
-.placeholder-item select {
-  width: 100%;
-  padding: 0.5rem;
-  margin-bottom: 0.5rem;
+@media (max-width: 600px) {
+  .placeholder-item {
+    grid-template-columns: 1fr;
+  }
+  
+  .placeholder-item h4 {
+    grid-column: span 1;
+  }
 }
 
 .validation-options {
@@ -847,5 +855,48 @@ button.reset-button {
   border-radius: 4px;
   cursor: pointer;
   margin-top: 0.5rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.save-button {
+  background-color: #42b983;
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cancel-button {
+  background-color: #e74c3c;
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.config-row label {
+  min-width: 80px;
+}
+
+.config-row select {
+  flex-grow: 1;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
 }
 </style>
