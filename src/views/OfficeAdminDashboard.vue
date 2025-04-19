@@ -91,22 +91,69 @@
         </div>
 
         <div class="templates-list">
-          <div
-            v-for="template in templates"
-            :key="template.id"
-            class="template-item"
-          >
+          <div v-for="template in templates" :key="template.id" class="template-item">
             <h3>{{ template.name }}</h3>
             <p v-if="template.status" :class="`status-${template.status}`">
               Status: {{ formatStatus(template.status) }}
             </p>
-            <button
-              @click="assignTemplate(template)"
-              :disabled="template.status !== 'processed'"
-              class="assign-button"
-            >
-              Atribuir a Clientes
-            </button>
+            <div class="template-actions">
+              <button
+                @click="assignTemplate(template)"
+                :disabled="template.status !== 'processed'"
+                class="assign-button"
+              >
+                Atribuir a Clientes
+              </button>
+              <button
+                v-if="template.status === 'processed' && template.placeholders"
+                @click="editPlaceholderMasks(template)"
+                class="edit-button"
+              >
+                Configurar Placeholders
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="showPlaceholderModal" class="modal-overlay">
+        <div class="modal-content">
+          <h3>Configurar modelo de documento</h3>
+          <div v-for="(placeholder, key) in currentPlaceholders" :key="key" class="placeholder-item">
+            <h4>{{ key }}</h4>
+            <div class="config-row">
+              <label>Apelido:</label>
+              <input 
+                v-model="placeholder.alias" 
+                type="text" 
+                placeholder="Nome amigável para exibição"
+                maxlength="100"
+                @input="validateFieldLength($event, 'alias', 100)"
+              />
+              <span class="char-counter">{{ placeholder.alias?.length || 0 }}/100</span>
+            </div>
+            <div class="config-row">
+              <label>Tipo:</label>
+              <select v-model="placeholder.type">
+                <option value="long_text">Texto Longo (até 1000 caracteres)</option>
+                <option value="short_text">Texto Curto (até 100 caracteres)</option>
+                <option value="name">Nome (somente letras)</option>
+                <option value="cpf">CPF</option>
+                <option value="cnpj">CNPJ</option>
+                <option value="email">E-mail</option>
+                <option value="phone">Telefone</option>
+              </select>
+            </div>
+            <div class="config-row checkbox-row">
+              <label>
+                <input type="checkbox" v-model="placeholder.required">
+                Obrigatório
+              </label>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button @click="savePlaceholderConfig" class="save-button">Salvar</button>
+            <button @click="showPlaceholderModal = false" class="cancel-button">Cancelar</button>
           </div>
         </div>
       </div>
@@ -473,6 +520,59 @@ onMounted(async () => {
   await setupTemplateListener();
   await fetchForms();
 });
+
+// Add these new data properties
+const showPlaceholderModal = ref(false);
+const currentTemplate = ref(null);
+const currentPlaceholders = ref<Placeholders>({});
+
+const editPlaceholderMasks = (template: { placeholders?: Placeholders }) => {
+  currentTemplate.value = template;
+  currentPlaceholders.value = template.placeholders 
+    ? JSON.parse(JSON.stringify(template.placeholders))
+    : {};
+  showPlaceholderModal.value = true;
+};
+
+const savePlaceholderConfig = async () => {
+  try {
+    for (const [key, placeholder] of Object.entries(currentPlaceholders.value)) {
+      if (placeholder.alias && placeholder.alias.length > MAX_FIELD_LENGTH) {
+        throw new Error(`O alias para ${key} excede o limite de ${MAX_FIELD_LENGTH} caracteres`);
+      }
+    }
+
+    await updateDoc(doc(db, "templates", currentTemplate.value.id), {
+      placeholders: currentPlaceholders.value
+    });
+    showPlaceholderModal.value = false;
+    successMessage.value = "Configurações de placeholders salvas com sucesso!";
+    setTimeout(() => successMessage.value = "", 3000);
+  } catch (error) {
+    errorMessage.value = "Erro ao salvar configurações: " + (error as Error).message;
+    console.error("Error saving placeholder config:", error);
+  }
+};
+
+const MAX_FIELD_LENGTH = 100;
+
+const validateFieldLength = (event: Event, field: string, maxLength: number) => {
+  const target = event.target as HTMLInputElement;
+  const value = target.value;
+  
+  if (value.length > maxLength) {
+    errorMessage.value = `${field} não pode exceder ${maxLength} caracteres`;
+    target.value = value.substring(0, maxLength);
+    // Force Vue to update the model
+    if (currentPlaceholders.value) {
+      for (const key in currentPlaceholders.value) {
+        if (currentPlaceholders.value[key][field]) {
+          currentPlaceholders.value[key][field] = currentPlaceholders.value[key][field].substring(0, maxLength);
+        }
+      }
+    }
+  }
+};
 </script>
 
 <style scoped>
@@ -632,6 +732,15 @@ button.reset-button {
   .template-upload {
     flex-direction: column;
   }
+
+  .modal-content {
+    padding: 1.5rem;
+    width: 95%;
+  }
+  
+  .placeholder-item {
+    padding: 1rem;
+  }
 }
 
 .upload-section {
@@ -717,5 +826,192 @@ button.reset-button {
 .assign-button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-sizing: border-box;
+}
+
+.modal-content h3 {
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.placeholder-item {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #f9f9f9;
+  box-sizing: border-box;
+}
+
+.placeholder-item h4 {
+  font-family: monospace;
+  background: #f0f0f0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.validation-options {
+  margin-top: 0.5rem;
+}
+
+.validation-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.template-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.edit-button {
+  background-color: #f39c12;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.save-button {
+  background-color: #42b983;
+  color: white;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.cancel-button {
+  background-color: #f5f5f5;
+  color: #666;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.cancel-button:hover {
+  background-color: #eee;
+  border-color: #ccc;
+}
+
+.config-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.config-row input[type="text"],
+.config-row select {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  width: 100%;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.config-row input[type="text"]:focus,
+.config-row select:focus {
+  outline: none;
+  border-color: #42b983;
+  box-shadow: 0 0 0 2px rgba(66, 185, 131, 0.2);
+}
+
+.config-row label {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #444;
+  font-size: 0.9rem;
+}
+
+.config-row:last-child {
+  margin-bottom: 0;
+}
+
+.config-row input:invalid {
+  border-color: #e74c3c;
+}
+
+.config-row input[type="checkbox"] {
+  margin-right: 0.5rem;
+}
+
+.config-row.checkbox-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+.config-row.checkbox-row label {
+  margin-bottom: 0;
+  font-weight: normal;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.config-row.checkbox-row input[type="checkbox"] {
+  width: auto;
+  margin-right: 0.5rem;
+}
+
+.char-counter {
+  font-size: 0.75rem;
+  color: #777;
+  text-align: right;
+  margin-top: 0.25rem;
+}
+
+.save-button:hover {
+  background-color: #3aa876;
 }
 </style>
