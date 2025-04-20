@@ -1,216 +1,137 @@
 <template>
   <div class="modal-overlay">
-    <div class="modal-content wide">
-      <span class="close" @click="$emit('close')">&times;</span>
-      <h2>Revisar Formulário</h2>
-
-      <div class="form-details">
-        <div class="form-meta">
-          <p><strong>Cliente:</strong> {{ customerName }}</p>
-          <p><strong>Template:</strong> {{ templateName }}</p>
-          <p>
-            <strong>Enviado em:</strong>
-            {{ new Date(form.createdAt?.seconds * 1000).toLocaleString() }}
-          </p>
+    <div class="modal-content">
+      <h2>Preencher Formulário</h2>
+      <p>Template: {{ templateName }}</p>
+      
+      <form @submit.prevent="submitForm">
+        <FormField
+          v-for="(placeholder, key) in templatePlaceholders"
+          :key="key"
+          :field-key="key"
+          v-model="formValues[key]"
+          :placeholder="placeholder"
+          @validation="updateValidation(key, $event)"
+        />
+        
+        <div class="form-actions">
+          <button type="button" @click="$emit('close')">Cancelar</button>
+          <button type="submit" :disabled="!isFormValid">Salvar</button>
         </div>
-
-        <div class="form-fields">
-          <div
-            v-for="(field, index) in form.fields"
-            :key="index"
-            class="field-item"
-          >
-            <h3>{{ field.label }}</h3>
-            <p>{{ field.value || "Não preenchido" }}</p>
-
-            <div class="field-actions">
-              <label>
-                <input
-                  type="radio"
-                  v-model="fieldReviews[index]"
-                  :value="{ approved: true }"
-                />
-                Aprovar
-              </label>
-
-              <label>
-                <input
-                  type="radio"
-                  v-model="fieldReviews[index]"
-                  :value="{ approved: false, comment: '' }"
-                />
-                Rejeitar
-              </label>
-
-              <textarea
-                v-if="fieldReviews[index] && !fieldReviews[index].approved"
-                v-model="fieldReviews[index].comment"
-                placeholder="Motivo da rejeição"
-              ></textarea>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-actions">
-        <button @click="submitReview(true)" class="approve">
-          Aprovar Tudo
-        </button>
-        <button @click="submitReview(false)" class="reject">
-          Rejeitar Tudo
-        </button>
-        <button @click="submitCustomReview" :disabled="!isCustomReviewComplete">
-          Submeter Revisão
-        </button>
-      </div>
+      </form>
     </div>
   </div>
 </template>
 
-<script setup>
-import { ref, computed } from "vue";
-import { getFirestore, doc, updateDoc } from "firebase/firestore";
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/firebase';
+import FormField from '@/components/FormField.vue';
+import type { PlaceholderConfig, Placeholders } from '@/shared/placeholder';
 
 const props = defineProps({
   form: {
-    type: Object,
-    required: true,
-  },
+    type: Object as () => FormDocument,
+    required: true
+  }
 });
 
-const emit = defineEmits(["close", "approved"]);
+const emit = defineEmits(['close', 'saved']);
 
-const db = getFirestore();
-const fieldReviews = ref([]);
+// Load template placeholders
+const templatePlaceholders = ref<Placeholders>({});
+const templateName = ref('');
 
-// Initialize field reviews
-props.form.fields?.forEach(() => {
-  fieldReviews.value.push({ approved: true });
-});
+// Form values and validation
+const formValues = ref<Record<string, string>>({});
+const fieldValidations = ref<Record<string, boolean>>({});
+const isFormValid = computed(() => Object.values(fieldValidations.value).every(valid => valid));
 
-const customerName = computed(() => {
-  // You might want to pass this as prop or fetch from store
-  return props.form.customerName || "Cliente Desconhecido";
-});
+onMounted(async () => {
+  // 1. Load template to get placeholders
+  const templateRef = doc(db, 'templates', props.form.templateId);
+  const templateSnap = await getDoc(templateRef);
+  
+  if (templateSnap.exists()) {
+    templatePlaceholders.value = templateSnap.data().placeholders || {};
+    templateName.value = templateSnap.data().name || 'Template sem nome';
+  }
 
-const templateName = computed(() => {
-  return props.form.templateName || "Template Desconhecido";
-});
-
-const isCustomReviewComplete = computed(() => {
-  return fieldReviews.value.every((review) => {
-    return review.approved || (!review.approved && review.comment);
+  // 2. Initialize form values
+  Object.keys(templatePlaceholders.value).forEach(key => {
+    // Initialize with existing value or empty string
+    formValues.value[key] = props.form.formData?.[key] || '';
+    // Initialize validation state (true if not required or has value)
+    fieldValidations.value[key] = !templatePlaceholders.value[key].required || !!props.form.formData?.[key];
   });
 });
 
-const submitReview = async (approveAll) => {
-  try {
-    await updateDoc(doc(db, "forms", props.form.id), {
-      status: approveAll ? "approved" : "rejected",
-      reviewedAt: serverTimestamp(),
-      reviewedBy: getAuth().currentUser.uid,
-      fields: props.form.fields.map((field) => ({
-        ...field,
-        approved: approveAll,
-        comment: approveAll ? "" : "Rejeitado em revisão geral",
-      })),
-    });
-    emit("approved");
-    emit("close");
-  } catch (error) {
-    console.error("Error submitting review:", error);
-  }
+const updateValidation = (fieldKey: string, isValid: boolean) => {
+  fieldValidations.value[fieldKey] = isValid;
 };
 
-const submitCustomReview = async () => {
+const submitForm = async () => {
   try {
-    await updateDoc(doc(db, "forms", props.form.id), {
-      status: fieldReviews.value.some((r) => !r.approved)
-        ? "rejected"
-        : "approved",
-      reviewedAt: serverTimestamp(),
-      reviewedBy: getAuth().currentUser.uid,
-      fields: props.form.fields.map((field, index) => ({
-        ...field,
-        approved: fieldReviews.value[index].approved,
-        comment: fieldReviews.value[index].approved
-          ? ""
-          : fieldReviews.value[index].comment,
-      })),
+    await updateDoc(doc(db, 'forms', props.form.id), {
+      formData: formValues.value,
+      status: 'completed',
+      updatedAt: serverTimestamp()
     });
-    emit("approved");
-    emit("close");
+    
+    emit('saved');
+    emit('close');
   } catch (error) {
-    console.error("Error submitting custom review:", error);
+    console.error('Error saving form:', error);
   }
 };
 </script>
 
 <style scoped>
 .modal-overlay {
-  /* Same as CustomerModal */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
 }
 
-.modal-content.wide {
-  max-width: 800px;
-}
-
-.form-details {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 2rem;
-}
-
-.form-meta {
-  border-right: 1px solid #eee;
-  padding-right: 1rem;
-}
-
-.form-fields {
-  max-height: 70vh;
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
   overflow-y: auto;
-}
-
-.field-item {
-  margin-bottom: 1.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid #eee;
-}
-
-.field-actions {
-  margin-top: 1rem;
-}
-
-.field-actions label {
-  display: block;
-  margin: 0.5rem 0;
-}
-
-.field-actions textarea {
-  width: 100%;
-  padding: 0.5rem;
-  margin-top: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  min-height: 80px;
 }
 
 .form-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 1rem;
   margin-top: 2rem;
 }
 
-.form-actions button {
-  flex: 1;
-  padding: 0.75rem;
+button {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-.form-actions button.approve {
-  background-color: #2ecc71;
+button[type="submit"] {
+  background-color: #42b983;
+  color: white;
+  border: none;
 }
 
-.form-actions button.reject {
-  background-color: #e74c3c;
+button[type="submit"]:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 }
 </style>

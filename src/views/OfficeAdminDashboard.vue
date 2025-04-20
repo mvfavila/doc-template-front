@@ -204,7 +204,7 @@
       v-if="selectedForm"
       :form="selectedForm"
       @close="selectedForm = null"
-      @approved="refreshForms"
+      @saved="refreshForms"
     />
   </div>
 </template>
