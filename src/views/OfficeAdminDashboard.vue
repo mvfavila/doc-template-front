@@ -183,6 +183,59 @@
           </div>
         </div>
       </div>
+
+      <!-- Customer Management -->
+      <div class="card">
+        <h2>Formulários de Clientes</h2>
+        
+        <div class="search-box">
+          <input v-model="clientSearch" placeholder="Buscar cliente..." @keyup.enter="searchClient" />
+          <button @click="searchClient">Buscar</button>
+        </div>
+
+        <!-- Show search results -->
+        <div v-if="clients.length > 0 && !selectedClient" class="search-results">
+          <h3>Resultados da Busca</h3>
+          <ul>
+            <li v-for="client in clients" :key="client.id" @click="selectClient(client)" class="client-item">
+              {{ client.name }} - {{ client.email }}
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="selectedClient">
+          <h3>Formulários de {{ selectedClient.name }}</h3>
+          
+          <div class="client-forms">
+            <div class="pending-forms">
+              <h4>Pendentes</h4>
+              <form-list 
+                :forms="clientPendingForms"
+                @open="openClientForm"
+              />
+            </div>
+            
+            <div class="completed-forms">
+              <h4>Enviados</h4>
+              <form-list 
+                :forms="clientCompletedForms"
+                :readonly="true"
+                @open="openClientForm"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Modal -->
+        <form-modal
+          v-if="selectedForm"
+          :form="selectedForm"
+          :template-id="selectedForm.templateId"
+          :readonly="isReadonly"
+          @close="selectedForm = null"
+          @submit="handleAdminFormSubmit"
+        />
+      </div>
     </section>
 
     <!-- Modals -->
@@ -261,6 +314,13 @@ const uploadProgress = ref(0);
 const uploadInProgress = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
+
+// State
+const clients = ref([]);
+const clientSearch = ref("");
+const selectedClient = ref(null);
+const clientForms = ref([]);
+const isReadonly = ref(false);
 
 let unsubscribeTemplates = null;
 
@@ -487,7 +547,6 @@ const formatStatus = (status) => {
   return statusMap[status] || status;
 };
 
-// Existing methods (unchanged)
 const assignTemplate = (template) => {
   selectedTemplate.value = template;
 };
@@ -571,6 +630,61 @@ const validateFieldLength = (event: Event, field: string, maxLength: number) => 
         }
       }
     }
+  }
+};
+
+// Computed
+const clientPendingForms = computed(() =>
+  clientForms.value.filter(form => form.status === 'draft' || form.status === 'pending')
+);
+
+const clientCompletedForms = computed(() =>
+  clientForms.value.filter(form => form.status === 'submitted' || form.status === 'approved')
+);
+
+// Methods
+const searchClient = async () => {
+  const q = query(
+    collection(db, "users"),
+    where("role", "==", "customer"),
+    where("name", ">=", clientSearch.value),
+    where("name", "<=", clientSearch.value + "\uf8ff")
+  );
+  const snapshot = await getDocs(q);
+  clients.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+};
+
+const selectClient = async (client) => {
+  selectedClient.value = client;
+  const q = query(
+    collection(db, "forms"),
+    where("customerId", "==", client.id)
+  );
+  const snapshot = await getDocs(q);
+  clientForms.value = snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+};
+
+const openClientForm = (form) => {
+  selectedForm.value = form;
+  isReadonly.value = form.status === 'submitted' || form.status === 'approved';
+};
+
+const handleAdminFormSubmit = async (formData) => {
+  try {
+    await updateDoc(doc(db, "forms", selectedForm.value.id), {
+      formData: formData,
+      status: "submitted",
+      submittedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      submittedBy: auth.currentUser.uid,
+    });
+    await selectClient(selectedClient.value); // Refresh forms
+    selectedForm.value = null;
+  } catch (error) {
+    console.error("Error submitting form:", error);
   }
 };
 </script>
@@ -1013,5 +1127,26 @@ button.reset-button {
 
 .save-button:hover {
   background-color: #3aa876;
+}
+
+.search-results {
+  margin-top: 1rem;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  padding: 1rem;
+}
+
+.client-item {
+  padding: 0.5rem;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+
+.client-item:hover {
+  background-color: #f5f5f5;
+}
+
+.client-item:last-child {
+  border-bottom: none;
 }
 </style>

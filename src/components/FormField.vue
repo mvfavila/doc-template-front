@@ -1,54 +1,70 @@
 <template>
-    <div class="form-field">
-      <label :for="fieldKey">{{ placeholder.alias }}</label>
-      
-      <!-- Text Input -->
-      <input
-        v-if="['short_text', 'long_text', 'name'].includes(placeholder.type)"
-        :id="fieldKey"
-        v-model="fieldValue"
-        :type="placeholder.type === 'name' ? 'text' : 'text'"
-        :maxlength="placeholder.type === 'short_text' ? 100 : 1000"
-        :required="placeholder.required"
-        @input="validateField"
-      />
-      
-      <!-- Email Input -->
-      <input
-        v-else-if="placeholder.type === 'email'"
-        :id="fieldKey"
-        v-model="fieldValue"
-        type="email"
-        :required="placeholder.required"
-        @input="validateField"
-      />
-      
-      <!-- Phone Input -->
-      <input
-        v-else-if="placeholder.type === 'phone'"
-        :id="fieldKey"
-        v-model="fieldValue"
-        type="tel"
-        :required="placeholder.required"
-        @input="validateField"
-      />
-      
-      <!-- CPF/CNPJ Input -->
-      <input
-        v-else-if="['cpf', 'cnpj'].includes(placeholder.type)"
-        :id="fieldKey"
-        v-model="fieldValue"
-        type="text"
-        :required="placeholder.required"
-        :pattern="placeholder.type === 'cpf' ? '\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}' : '\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}'"
-        @input="validateField"
-      />
-      
-      <div v-if="error" class="error-message">{{ error }}</div>
+  <div class="form-field">
+    <label :for="fieldKey">{{ placeholder.alias }}</label>
+    
+    <!-- Read Only -->
+    <input
+      v-if="!readonly"
+      :id="fieldKey"
+      v-model="fieldValue"
+      :type="getInputType()"
+      :maxlength="getMaxLength()"
+      :required="placeholder.required"
+      :pattern="getPattern()"
+      @input="validateField"
+    />
+
+    <div v-else class="readonly-value">
+      {{ fieldValue || '-' }}
     </div>
-  </template>
+
+    <!-- Text Input -->
+    <input
+      v-if="['short_text', 'long_text', 'name'].includes(placeholder.type)"
+      :id="fieldKey"
+      v-model="fieldValue"
+      :type="placeholder.type === 'name' ? 'text' : 'text'"
+      :maxlength="placeholder.type === 'short_text' ? 100 : 1000"
+      :required="placeholder.required"
+      @input="validateField"
+    />
+    
+    <!-- Email Input -->
+    <input
+      v-else-if="placeholder.type === 'email'"
+      :id="fieldKey"
+      v-model="fieldValue"
+      type="email"
+      :required="placeholder.required"
+      @input="validateField"
+    />
+    
+    <!-- Phone Input -->
+    <input
+      v-else-if="placeholder.type === 'phone'"
+      :id="fieldKey"
+      v-model="fieldValue"
+      type="tel"
+      :required="placeholder.required"
+      @input="validateField"
+    />
+    
+    <!-- CPF/CNPJ Input -->
+    <input
+      v-else-if="['cpf', 'cnpj'].includes(placeholder.type)"
+      :id="fieldKey"
+      v-model="fieldValue"
+      type="text"
+      :required="placeholder.required"
+      :pattern="placeholder.type === 'cpf' ? '\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}' : '\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}'"
+      @input="validateField"
+    />
+    
+    <div v-if="error" class="error-message">{{ error }}</div>
+  </div>
+</template>
   
-  <script setup lang="ts">
+<script setup lang="ts">
   import { ref, watch } from 'vue';
   
   const props = defineProps({
@@ -63,7 +79,8 @@
     modelValue: {
       type: String,
       default: ''
-    }
+    },
+    readonly: Boolean
   });
   
   const emit = defineEmits(['update:modelValue', 'validation']);
@@ -107,9 +124,9 @@
     error.value = '';
     emit('validation', true);
   };
-  </script>
+</script>
   
-  <style scoped>
+<style scoped>
   .form-field {
     margin-bottom: 1rem;
   }
@@ -132,4 +149,10 @@
     font-size: 0.8rem;
     margin-top: 0.25rem;
   }
-  </style>
+
+  .readonly-value {
+    padding: 0.5rem;
+    background: #f5f5f5;
+    border-radius: 4px;
+  }
+</style>
