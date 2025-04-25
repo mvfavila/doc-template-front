@@ -64,7 +64,7 @@ const isLoading = ref(false);
 
 // Computed
 const pendingDocuments = computed(() => 
-  forms.value.filter(form => form.status === 'draft' || form.status === 'pending')
+  forms.value.filter(form => form.status === 'pending')
 );
 
 const completedDocuments = computed(() =>
@@ -139,7 +139,7 @@ const handleFormSave = async (formData) => {
   try {
     await updateDoc(doc(db, "forms", selectedForm.value.id), {
       formData: formData,
-      status: "draft",
+      status: "pending",
       updatedAt: serverTimestamp()
     });
     await fetchForms();

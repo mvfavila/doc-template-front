@@ -22,11 +22,11 @@
       
       <div class="document-actions">
         <button
-          v-if="!readonly && (document.status === 'pending' || document.status === 'draft')"
+          v-if="!readonly && document.status === 'pending'"
           @click="$emit('submit', document.id)"
           class="action-button"
         >
-          {{ document.status === 'draft' ? 'Continuar' : 'Enviar' }}
+          {{ document.status === 'pending' ? 'Continuar' : 'Enviar' }}
         </button>
       </div>
     </div>
@@ -54,7 +54,6 @@ defineProps({
 
 const translateStatus = (status) => {
   const statusMap = {
-    draft: "Rascunho",
     pending: "Pendente",
     submitted: "Enviado",
     approved: "Aprovado",

@@ -635,7 +635,7 @@ const validateFieldLength = (event: Event, field: string, maxLength: number) => 
 
 // Computed
 const clientPendingForms = computed(() =>
-  clientForms.value.filter(form => form.status === 'draft' || form.status === 'pending')
+  clientForms.value.filter(form => form.status === 'pending')
 );
 
 const clientCompletedForms = computed(() =>
