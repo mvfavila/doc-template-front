@@ -12,6 +12,8 @@
         <client-document-list
           :documents="pendingDocuments"
           @submit="handleDocumentSubmit"
+          @edit="handleDocumentEdit"
+          @continue="handleDocumentContinue"
         />
       </div>
 
@@ -28,8 +30,9 @@
     <!-- Form Modal -->
     <form-modal
       v-if="selectedForm"
+      :key="selectedForm.id"
       :form="selectedForm"
-      :template-id="selectedForm.templateId"
+      :template-id="selectedForm?.templateId"
       :readonly="isReadonly"
       @close="selectedForm = null"
       @submit="handleFormSubmit"
@@ -52,6 +55,7 @@ import {
   serverTimestamp
 } from "firebase/firestore";
 import ClientDocumentList from '@/components/client/ClientDocumentList.vue';
+import FormModal from '@/components/client/FormModal.vue';
 
 const db = getFirestore();
 const { user } = useAuth();
@@ -112,7 +116,15 @@ const handleDocumentSubmit = async (formId) => {
   }
 };
 
-const handleSaveDraft = async (formId) => {
+const handleDocumentEdit = async (formId) => {
+  const form = forms.value.find(f => f.id === formId);
+  if (form) {
+    selectedForm.value = form;
+    isReadonly.value = false;
+  }
+};
+
+const handleDocumentContinue = async (formId) => {
   const form = forms.value.find(f => f.id === formId);
   if (form) {
     selectedForm.value = form;
