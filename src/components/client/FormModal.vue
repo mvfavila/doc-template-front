@@ -6,14 +6,23 @@
         <button class="close-button" @click="$emit('close')">×</button>
       </div>
       
-      <form @submit.prevent="handleSubmit">
+      <div v-if="isLoading" class="loading-state">
+        Carregando formulário...
+      </div>
+      
+      <form v-else @submit.prevent="handleSubmit">
+        <div v-if="Object.keys(templatePlaceholders).length === 0" class="empty-state">
+          Nenhum campo encontrado no template
+        </div>
+        
         <FormField
           v-for="(placeholder, key) in templatePlaceholders"
           :key="key"
           :field-key="key"
-          v-model="formValues[key]"
           :placeholder="placeholder"
+          :model-value="formValues[key]"
           :readonly="readonly"
+          @update:modelValue="updateFormValue(key, $event)"
           @validation="updateValidation(key, $event)"
         />
         
@@ -35,7 +44,7 @@
 </template>
   
 <script setup>
-  import { ref, computed, onMounted } from "vue";
+  import { ref, computed, watch, onMounted } from "vue";
   import { doc, getDoc } from "@firebase/firestore";
   import { db } from "@/firebase";
   import FormField from "@/components/FormField.vue";
@@ -51,34 +60,57 @@
   const templatePlaceholders = ref({});
   const formValues = ref({});
   const fieldValidations = ref({});
+  const isLoading = ref(true);
   
   const isFormValid = computed(() => 
     Object.values(fieldValidations.value).every(valid => valid)
   );
+
+  const loadTemplate = async (templateId) => {
+    try {
+      isLoading.value = true;
+      const templateRef = doc(db, "templates", templateId);
+      const templateSnap = await getDoc(templateRef);
+      
+      if (templateSnap.exists()) {
+        const templateData = templateSnap.data();
+        templatePlaceholders.value = templateData.placeholders || {};
+        
+        // Initialize form values
+        if (props.form?.formData) {
+          formValues.value = { ...props.form.formData };
+        } else {
+          // Initialize empty values for all fields
+          Object.keys(templatePlaceholders.value).forEach(key => {
+            formValues.value[key] = '';
+          });
+        }
+        
+        // Initialize validation state
+        Object.keys(templatePlaceholders.value).forEach(key => {
+          fieldValidations.value[key] = !templatePlaceholders.value[key]?.required;
+        });
+      } else {
+        templatePlaceholders.value = {};
+      }
+    } catch (error) {
+      console.error('Error loading template:', error);
+    } finally {
+      isLoading.value = false;
+    }
+  };
   
   onMounted(async () => {
-    // Load template placeholders
-    const templateRef = doc(db, "templates", props.templateId);
-    const templateSnap = await getDoc(templateRef);
-    
-    if (templateSnap.exists()) {
-      templatePlaceholders.value = templateSnap.data().placeholders || {};
+    if (props.templateId) {
+      await loadTemplate(props.templateId);
     }
-  
-    // Initialize form values
-    if (props.form.formData) {
-      formValues.value = { ...props.form.formData };
-    } else {
-      // Initialize empty values for all fields
-      Object.keys(templatePlaceholders.value).forEach(key => {
-        formValues.value[key] = '';
-      });
+  });
+
+  // Watch for templateId changes
+  watch(() => props.templateId, async (newTemplateId) => {
+    if (newTemplateId) {
+      await loadTemplate(newTemplateId);
     }
-  
-    // Initialize validation state
-    Object.keys(templatePlaceholders.value).forEach(key => {
-      fieldValidations.value[key] = !templatePlaceholders.value[key].required;
-    });
   });
   
   const updateValidation = (fieldKey, isValid) => {
@@ -97,6 +129,10 @@
     } else {
       emit('save', formValues.value);
     }
+  };
+
+  const updateFormValue = (key, value) => {
+    formValues.value[key] = value;
   };
 </script>
   
@@ -124,6 +160,11 @@
     overflow-y: auto;
   }
 
+  .modal-content form {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
   .modal-header {
     display: flex;
     justify-content: space-between;
@@ -138,6 +179,23 @@
     cursor: pointer;
     padding: 0.5rem;
     line-height: 1;
+  }
+
+  .form-field {
+    margin-bottom: 1.5rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .form-field input,
+  .form-field textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+    box-sizing: border-box; /* Add this */
   }
 
   .form-actions {
@@ -166,5 +224,18 @@
 
   .save-submit-button {
     background: #42b983;
+  }
+
+  .loading-state {
+    padding: 2rem;
+    text-align: center;
+    color: #666;
+  }
+
+  .empty-state {
+    padding: 1rem;
+    text-align: center;
+    color: #666;
+    margin: 1rem 0;
   }
 </style>
