@@ -181,8 +181,6 @@
       // Reset form on success
       newOfficeAdmin.value = { name: '', email: '', password: '', officeId: '' }
       await fetchOfficeAdmins() // Refresh the admin list
-      
-      console.log('Office admin created:', result.data)
     } catch (error) {
       console.error('Error creating office admin:', error)
       // You might want to show this error to the user
