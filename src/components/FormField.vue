@@ -18,6 +18,7 @@
         :maxlength="maxLength"
         :required="placeholder.required"
         @input="handleInput"
+        @blur="handleBlur"
       />
 
       <!-- Textarea for long text -->
@@ -29,6 +30,7 @@
         :maxlength="maxLength"
         rows="4"
         @input="handleInput"
+        @blur="handleBlur"
       ></textarea>
 
       <!-- Email Input -->
@@ -39,6 +41,7 @@
         type="email"
         :required="placeholder.required"
         @input="handleInput"
+        @blur="handleBlur"
       />
 
       <!-- Phone Input -->
@@ -49,6 +52,29 @@
         type="tel"
         :required="placeholder.required"
         @input="handleInput"
+        @blur="handleBlur"
+      />
+
+      <!-- CPF Input -->
+      <input
+        v-else-if="placeholder.type === 'cpf'"
+        :id="fieldKey"
+        v-model="inputValue"
+        type="cpf"
+        :required="placeholder.required"
+        @input="handleInput"
+        @blur="handleBlur"
+      />
+
+      <!-- CNPJ Input -->
+      <input
+        v-else-if="placeholder.type === 'cnpj'"
+        :id="fieldKey"
+        v-model="inputValue"
+        type="cnpj"
+        :required="placeholder.required"
+        @input="handleInput"
+        @blur="handleBlur"
       />
 
       <div v-if="error" class="error-message">{{ error }}</div>
@@ -95,6 +121,8 @@
       case 'email': return 'email';
       case 'phone': return 'tel';
       case 'name': return 'text';
+      case 'cpf': return 'cpf';
+      case 'cnpj': return 'cnpj';
       default: return 'text';
     }
   });
@@ -118,32 +146,55 @@
   });
   
   // Methods
-  const handleInput = () => {
-    emit('update:modelValue', inputValue.value);
+  const handleBlur = () => {
     validateField();
   };
 
+  const handleInput = () => {
+    emit('update:modelValue', inputValue.value);
+    // Only validate immediately for required fields
+    if (props.placeholder.required) {
+      validateField();
+    }
+  };
+
   const validateField = () => {
-    if (props.placeholder.required && !inputValue.value?.trim()) {
+    const value = inputValue.value?.toString().trim();
+    
+    // Skip validation if field is empty and not required
+    if (!props.placeholder.required && !value) {
+      error.value = '';
+      emit('validation', true); // Consider empty non-required fields as valid
+      return;
+    }
+    
+    if (props.placeholder.required && !value) {
       error.value = 'Este campo é obrigatório';
       emit('validation', false);
       return;
     }
 
     // Type-specific validation
-    if (props.placeholder.type === 'email' && !/^\S+@\S+\.\S+$/.test(inputValue.value)) {
+    if (props.placeholder.type === 'number' && isNaN(Number(value))) {
+      error.value = 'Por favor insira um número válido';
+      emit('validation', false);
+      return;
+    }
+
+    // Type-specific validation
+    if (props.placeholder.type === 'email' && !/^\S+@\S+\.\S+$/.test(value)) {
       error.value = 'Por favor insira um email válido';
       emit('validation', false);
       return;
     }
 
-    if (props.placeholder.type === 'cpf' && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(inputValue.value)) {
+    if (props.placeholder.type === 'cpf' && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(value)) {
       error.value = 'Por favor insira um CPF válido (000.000.000-00)';
       emit('validation', false);
       return;
     }
 
-    if (props.placeholder.type === 'cnpj' && !/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(inputValue.value)) {
+    if (props.placeholder.type === 'cnpj' && !/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(value)) {
       error.value = 'Por favor insira um CNPJ válido (00.000.000/0000-00)';
       emit('validation', false);
       return;

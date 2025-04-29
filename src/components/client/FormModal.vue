@@ -32,10 +32,18 @@
             v-if="!readonly" 
             type="button" 
             class="save-button"
-            :class="{ 'save-submit-button': isFormValid }"
+            :class="{ 'save-submit-button': isSubmitValid }"
             @click="handleSave"
           >
-            {{ isFormValid ? 'Salvar e Enviar' : 'Salvar' }}
+            Salvar
+          </button>
+          <button 
+            v-if="!readonly" 
+            type="submit" 
+            class="submit-button"
+            :disabled="!isSubmitValid"
+          >
+            Enviar
           </button>
         </div>
       </form>
@@ -61,10 +69,59 @@
   const formValues = ref({});
   const fieldValidations = ref({});
   const isLoading = ref(true);
-  
-  const isFormValid = computed(() => 
-    Object.values(fieldValidations.value).every(valid => valid)
-  );
+
+  // Computed
+  const isSaveValid = computed(() => {
+    return Object.entries(fieldValidations.value).every(([key, isValid]) => {
+      const placeholder = templatePlaceholders.value[key];
+      const value = formValues.value[key].toString().trim();
+
+      if (!placeholder.required && !inputHasValue(key)) {
+        // Consider empty non-required fields as valid
+        return true;
+      }
+      
+      if (placeholder.required && !inputHasValue(key)) {
+        // Consider empty non-required fields as valid for saving (not for submit)
+        return true;
+      }
+
+      // Type-specific validation
+      if (placeholder.type === 'number' && isNaN(Number(value))) {
+        return false;
+      }
+
+      // Type-specific validation
+      if (placeholder.type === 'email' && !/^\S+@\S+\.\S+$/.test(value)) {
+        return false;
+      }
+
+      if (placeholder.type === 'cpf' && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(value)) {
+        return false;
+      }
+
+      if (placeholder.type === 'cnpj' && !/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(value)) {
+        return false;
+      }
+
+      return isValid;
+    });
+  });
+
+  const isSubmitValid = computed(() => {
+    return Object.entries(fieldValidations.value).every(([key, isValid]) => {
+      const placeholder = templatePlaceholders.value[key];
+      if (placeholder?.required && !inputHasValue(key)) {
+        return false;
+      }
+      return isValid;
+    });
+  });
+
+  // Methods
+  const inputHasValue = (key) => {
+    return formValues.value[key] && formValues.value[key].toString().trim() !== '';
+  };
 
   const loadTemplate = async (templateId) => {
     try {
@@ -118,17 +175,31 @@
   };
   
   const handleSubmit = () => {
-    if (isFormValid.value) {
+    if (isSubmitValid.value) {
       emit('submit', formValues.value);
+    } else {
+      // Show validation errors
+      Object.keys(fieldValidations.value).forEach(key => {
+        const placeholder = templatePlaceholders.value[key];
+        if (placeholder?.required && (!fieldValidations.value[key] || !inputHasValue(key))) {
+          document.getElementById(key)?.dispatchEvent(new Event('blur'));
+        }
+      });
     }
   };
   
   const handleSave = () => {
-    if (isFormValid.value) {
-      emit('submit', formValues.value);
-    } else {
-      emit('save', formValues.value);
-    }
+    // Trigger validation for all fields
+    Object.keys(templatePlaceholders.value).forEach(key => {
+      document.getElementById(key)?.dispatchEvent(new Event('blur'));
+    });
+
+    // Wait for the next tick to ensure validations have updated
+    setTimeout(() => {
+      if (isSaveValid.value) {
+        emit('save', formValues.value);
+      }
+    }, 0);
   };
 
   const updateFormValue = (key, value) => {
@@ -195,7 +266,7 @@
     border-radius: 4px;
     font-size: 1rem;
     transition: border-color 0.2s;
-    box-sizing: border-box; /* Add this */
+    box-sizing: border-box;
   }
 
   .form-actions {
@@ -237,5 +308,19 @@
     text-align: center;
     color: #666;
     margin: 1rem 0;
+  }
+
+  .submit-button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    background: #42b983;
+    color: white;
+    cursor: pointer;
+  }
+
+  .submit-button:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
   }
 </style>
