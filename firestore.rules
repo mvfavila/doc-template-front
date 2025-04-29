@@ -15,7 +15,7 @@ service cloud.firestore {
     
     match /templates/{templateId} {
       allow write: if isOfficeAdmin();
-      allow read: if isSpecificOfficeAdmin(resource.data.officeId);
+      allow read: if isOfficeAdmin() || isCustomer();
     }
     
     match /forms/{formId} {
