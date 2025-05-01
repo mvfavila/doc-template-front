@@ -16,7 +16,6 @@
               <input 
                 type="checkbox" 
                 v-model="formData[key].approved"
-                :disabled="!!formData[key].comment"
                 @change="handleApprovalChange(key)"
               >
               Aprovar
