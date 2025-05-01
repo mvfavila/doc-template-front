@@ -110,9 +110,19 @@ let saveSuccessTimeout: number;
 
 // Computed properties
 const allFieldsReviewed = computed(() => {
-  return Object.keys(templatePlaceholders.value).every(key => {
+  const fields = Object.keys(templatePlaceholders.value);
+  
+  // Check if all fields are either approved or have a comment
+  const allReviewed = fields.every(key => {
     return formData.value[key]?.approved || !!formData.value[key]?.comment;
   });
+
+  // Check if at least one field has a comment
+  const hasAtLeastOneComment = fields.some(key => {
+    return !!formData.value[key]?.comment;
+  });
+
+  return allReviewed && hasAtLeastOneComment;
 });
 
 const allFieldsApproved = computed(() => {
