@@ -4,7 +4,7 @@
     
     <!-- Readonly Display -->
     <div v-if="readonly" class="readonly-value">
-      {{ displayValue }}
+      <div class="field-value">{{ displayValue }}</div>
     </div>
 
     <!-- Editable Input -->
@@ -13,7 +13,7 @@
       <input
         v-if="!isSpecialType"
         :id="fieldKey"
-        v-model="inputValue"
+        v-model="fieldData.value"
         :type="inputType"
         :maxlength="maxLength"
         :required="placeholder.required"
@@ -25,7 +25,7 @@
       <textarea
         v-else-if="placeholder.type === 'long_text'"
         :id="fieldKey"
-        v-model="inputValue"
+        v-model="fieldData.value"
         :required="placeholder.required"
         :maxlength="maxLength"
         rows="4"
@@ -37,7 +37,7 @@
       <input
         v-else-if="placeholder.type === 'email'"
         :id="fieldKey"
-        v-model="inputValue"
+        v-model="fieldData.value"
         type="email"
         :required="placeholder.required"
         @input="handleInput"
@@ -48,7 +48,7 @@
       <input
         v-else-if="placeholder.type === 'phone'"
         :id="fieldKey"
-        v-model="inputValue"
+        v-model="fieldData.value"
         type="tel"
         :required="placeholder.required"
         @input="handleInput"
@@ -59,7 +59,7 @@
       <input
         v-else-if="placeholder.type === 'cpf'"
         :id="fieldKey"
-        v-model="inputValue"
+        v-model="fieldData.value"
         type="cpf"
         :required="placeholder.required"
         @input="handleInput"
@@ -70,12 +70,16 @@
       <input
         v-else-if="placeholder.type === 'cnpj'"
         :id="fieldKey"
-        v-model="inputValue"
+        v-model="fieldData.value"
         type="cnpj"
         :required="placeholder.required"
         @input="handleInput"
         @blur="handleBlur"
       />
+
+      <div v-if="fieldData.comment" class="field-comment">
+        <strong>Comentário:</strong> {{ fieldData.comment }}
+      </div>
 
       <div v-if="error" class="error-message">{{ error }}</div>
     </template>
@@ -100,15 +104,24 @@
       })
     },
     modelValue: {
-      type: [String, Number],
-      default: ''
+      type: Object,
+      required: true,
+      default: () => ({
+        value: '',
+        approved: false,
+        comment: ''
+      })
     },
     readonly: Boolean
   });
   
   const emit = defineEmits(['update:modelValue', 'validation']);
-  
-  const inputValue = ref(props.modelValue);
+
+  const fieldData = ref({
+    value: props.modelValue.value || '',
+    approved: props.modelValue.approved || false,
+    comment: props.modelValue.comment || ''
+  });
   const error = ref('');
 
   // Computed properties
@@ -136,30 +149,11 @@
   });
 
   const displayValue = computed(() => {
-    if (!inputValue.value) return '-';
-    return inputValue.value;
+    return fieldData.value.value || '-';
   });
-  
-  // Watchers
-  watch(() => props.modelValue, (newVal) => {
-    inputValue.value = newVal;
-  });
-  
-  // Methods
-  const handleBlur = () => {
-    validateField();
-  };
-
-  const handleInput = () => {
-    emit('update:modelValue', inputValue.value);
-    // Only validate immediately for required fields
-    if (props.placeholder.required) {
-      validateField();
-    }
-  };
 
   const validateField = () => {
-    const value = inputValue.value?.toString().trim();
+    const value = fieldData.value.value?.toString().trim();
     
     // Skip validation if field is empty and not required
     if (!props.placeholder.required && !value) {
@@ -203,9 +197,49 @@
     error.value = '';
     emit('validation', true);
   };
+  
+  // Watchers
+  watch(() => props.modelValue, (newVal) => {
+    fieldData.value = {
+      value: newVal.value || '',
+      approved: newVal.approved || false,
+      comment: newVal.comment || ''
+    };
+    // Validate immediately when model changes
+    validateField();
+  }, { deep: true, immediate: true });
+  
+  // Methods
+  const handleBlur = () => {
+    validateField();
+  };
+
+  const handleInput = () => {
+    // Always emit the full structure
+    emit('update:modelValue', {
+      ...fieldData.value,
+      value: fieldData.value.value
+    });
+    
+    if (props.placeholder.required) {
+      validateField();
+    }
+  };
 </script>
   
 <style scoped>
+  .field-value {
+    margin-bottom: 0.5rem;
+  }
+
+  .field-comment {
+    padding: 0.5rem;
+    background: #fff8e1;
+    border-left: 3px solid #ffc107;
+    font-size: 0.9rem;
+    color: #5d4037;
+  }
+
   .form-field {
     margin-bottom: 1.5rem;
     width: 100%;
