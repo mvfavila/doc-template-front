@@ -20,8 +20,8 @@
           :key="key"
           :field-key="key"
           :placeholder="placeholder"
-          :model-value="formValues[key]"
-          :readonly="readonly"
+          :model-value="getFieldValue(key)"
+          :readonly="isFieldReadonly(key)"
           @update:modelValue="updateFormValue(key, $event)"
           @validation="updateValidation(key, $event)"
         />
@@ -52,7 +52,7 @@
 </template>
   
 <script setup>
-  import { ref, computed, watch, onMounted } from "vue";
+  import { ref, computed, watch, onMounted, nextTick } from "vue";
   import { doc, getDoc } from "@firebase/firestore";
   import { db } from "@/firebase";
   import FormField from "@/components/FormField.vue";
@@ -74,7 +74,12 @@
   const isSaveValid = computed(() => {
     return Object.entries(fieldValidations.value).every(([key, isValid]) => {
       const placeholder = templatePlaceholders.value[key];
-      const value = formValues.value[key].toString().trim();
+      const input = formValues.value[key];
+      
+      if (input.approved) {
+        // Skip validation for previously approved fields
+        return true;
+      }
 
       if (!placeholder.required && !inputHasValue(key)) {
         // Consider empty non-required fields as valid
@@ -86,41 +91,62 @@
         return true;
       }
 
-      // Type-specific validation
-      if (placeholder.type === 'number' && isNaN(Number(value))) {
-        return false;
-      }
+      const textInput = input?.toString().trim();
 
       // Type-specific validation
-      if (placeholder.type === 'email' && !/^\S+@\S+\.\S+$/.test(value)) {
+      if (placeholder.type === 'number' && isNaN(Number(textInput))) {
         return false;
       }
 
-      if (placeholder.type === 'cpf' && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(value)) {
+      // Type-specific validation
+      if (placeholder.type === 'email' && !/^\S+@\S+\.\S+$/.test(textInput)) {
         return false;
       }
 
-      if (placeholder.type === 'cnpj' && !/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(value)) {
+      if (placeholder.type === 'cpf' && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(textInput)) {
         return false;
       }
 
-      return isValid;
+      if (placeholder.type === 'cnpj' && !/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(textInput)) {
+        return false;
+      }
+
+        return isValid;
     });
   });
 
   const isSubmitValid = computed(() => {
     return Object.entries(fieldValidations.value).every(([key, isValid]) => {
+      const input = formValues.value[key];
       const placeholder = templatePlaceholders.value[key];
-      if (placeholder?.required && !inputHasValue(key)) {
-        return false;
+      
+      // Skip validation for approved fields
+      if (input?.approved) return true;
+      
+      // Required fields must have a value and be valid
+      if (placeholder?.required) {
+        const hasValue = input?.value?.toString().trim() !== '';
+        return hasValue && isValid;
       }
-      return isValid;
+      
+      // Non-required fields are valid if either empty or valid when filled
+      return !input?.value || isValid;
     });
   });
 
   // Methods
+  const getFieldValue = (key) => {
+    const fieldData = formValues.value[key];
+    return fieldData || '';
+  };
+
+  const isFieldReadonly = (key) => {
+    // If in readonly mode or field is approved
+    return props.readonly || (formValues.value[key]?.approved === true);
+  };
+
   const inputHasValue = (key) => {
-    return formValues.value[key] && formValues.value[key].toString().trim() !== '';
+    return formValues.value[key] && formValues.value[key]?.value?.toString().trim() !== '';
   };
 
   const loadTemplate = async (templateId) => {
@@ -135,17 +161,40 @@
         
         // Initialize form values
         if (props.form?.formData) {
-          formValues.value = { ...props.form.formData };
-        } else {
-          // Initialize empty values for all fields
+          formValues.value = {};
           Object.keys(templatePlaceholders.value).forEach(key => {
-            formValues.value[key] = '';
+            const existingValue = props.form.formData[key];
+            if (existingValue && typeof existingValue === 'object') {
+              formValues.value[key] = { ...existingValue };
+            } else {
+              formValues.value[key] = {
+                value: existingValue || '',
+                approved: false,
+                comment: ''
+              };
+            }
+          });
+        } else {
+          Object.keys(templatePlaceholders.value).forEach(key => {
+            formValues.value[key] = {
+              value: '',
+              approved: false,
+              comment: ''
+            };
           });
         }
         
-        // Initialize validation state
+        // Initialize validation state and trigger validation
+        await nextTick(); // Wait for the next tick to ensure FormFields are rendered
         Object.keys(templatePlaceholders.value).forEach(key => {
-          fieldValidations.value[key] = !templatePlaceholders.value[key]?.required;
+          const placeholder = templatePlaceholders.value[key];
+          if (placeholder?.required) {
+            // Trigger validation for required fields
+            document.getElementById(key)?.dispatchEvent(new Event('blur'));
+          } else {
+            // Non-required fields are valid by default
+            fieldValidations.value[key] = true;
+          }
         });
       } else {
         templatePlaceholders.value = {};
@@ -176,7 +225,20 @@
   
   const handleSubmit = () => {
     if (isSubmitValid.value) {
-      emit('submit', formValues.value);
+      // Ensure all fields have the proper structure before submitting
+      const formattedData = {};
+      Object.keys(formValues.value).forEach(key => {
+        if (typeof formValues.value[key] === 'object') {
+          formattedData[key] = formValues.value[key];
+        } else {
+          formattedData[key] = {
+            value: formValues.value[key],
+            approved: false,
+            comment: ''
+          };
+        }
+      });
+      emit('submit', formattedData);
     } else {
       // Show validation errors
       Object.keys(fieldValidations.value).forEach(key => {
@@ -197,7 +259,20 @@
     // Wait for the next tick to ensure validations have updated
     setTimeout(() => {
       if (isSaveValid.value) {
-        emit('save', formValues.value);
+        // Ensure all fields have the proper structure before saving
+        const formattedData = {};
+        Object.keys(formValues.value).forEach(key => {
+          if (typeof formValues.value[key] === 'object') {
+            formattedData[key] = formValues.value[key];
+          } else {
+            formattedData[key] = {
+              value: formValues.value[key],
+              approved: false,
+              comment: ''
+            };
+          }
+        });
+        emit('save', formattedData);
       }
     }, 0);
   };
