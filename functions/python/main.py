@@ -1,10 +1,9 @@
-from firebase_functions import firestore_fn, options
-from firebase_admin import initialize_app, firestore, storage
+from firebase_functions import firestore_fn
+from firebase_admin import initialize_app, storage
 import google.cloud.firestore
 import tempfile
 import os
 from docx import Document
-from docx2pdf import convert
 import re
 import sys
 from pathlib import Path
@@ -96,76 +95,3 @@ def extract_placeholders(docx_path: str) -> list:
                 placeholders.update(matches)
 
     return list(placeholders)
-
-# Optional: Function to generate documents from template and data
-@firestore_fn.on_document_created(document="document_jobs/{jobId}")
-def generatedocuments(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
-    """Generates documents from template and provided data."""
-    
-    snapshot = event.data
-    if not snapshot.exists:
-        print("Document no longer exists")
-        return
-
-    job_data = snapshot.to_dict()
-    template_ref = firestore.client().collection("templates").document(job_data["templateId"])
-    template_doc = template_ref.get()
-    template_data = template_doc.to_dict()
-
-    try:
-        # Update job status
-        snapshot.reference.update({"status": "processing"})
-
-        # 1. Download the template
-        bucket_name = template_data["downloadURL"].split('/')[5]
-        bucket = storage.bucket(bucket_name)
-        
-        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as temp_template:
-            template_path = temp_template.name
-            blob = bucket.blob(template_data["storagePath"])
-            blob.download_to_filename(template_path)
-            print(f"Downloaded template to {template_path}")
-
-            # 2. Process each row of data (assuming data is in the job document)
-            for row in job_data["data_rows"]:
-                process_number = re.sub(r'[^\w\-_\.]', '_', row["NUMERO_DO_PROCESSO"])
-                
-                # Create filled document
-                doc = Document(template_path)
-                for paragraph in doc.paragraphs:
-                    for key, value in row.items():
-                        placeholder = f"{{{key}}}"
-                        if placeholder in paragraph.text:
-                            paragraph.text = paragraph.text.replace(placeholder, str(value))
-                
-                # Save filled DOCX
-                output_docx = f"{process_number}_{template_data['name']}.docx"
-                doc.save(output_docx)
-                
-                # Convert to PDF
-                convert(output_docx)
-                output_pdf = output_docx.replace(".docx", ".pdf")
-                print(f"Generated files: {output_docx} and {output_pdf}")
-
-                # Upload to Storage
-                output_bucket = storage.bucket("your-output-bucket-name")
-                for file in [output_docx, output_pdf]:
-                    blob = output_bucket.blob(f"processed_documents/{file}")
-                    blob.upload_from_filename(file)
-                    os.remove(file)
-
-        # Update job status
-        snapshot.reference.update({"status": "completed"})
-
-    except Exception as error:
-        print(f"Error generating documents: {error}")
-        snapshot.reference.update({
-            "status": "error",
-            "error": str(error)
-        })
-        raise
-
-    finally:
-        # Clean up temporary files
-        if 'template_path' in locals() and os.path.exists(template_path):
-            os.remove(template_path)

@@ -74,9 +74,10 @@ deploy-py-functions:
 		python3.10 -m pip install --upgrade pip && \
 		python3.10 -m pip install -r requirements.txt --no-cache-dir && \
 		echo "4. Verifying critical imports..." && \
-		python3.10 -c "from firebase_functions import https_fn; from docx import Document; from docx2pdf import convert; from google.cloud import storage; print('✓ All dependencies verified')" && \
+		python3.10 -c "from firebase_functions import firestore_fn, options; from firebase_admin import initialize_app, firestore, storage; from docx import Document; from google.cloud import storage as gcs; print('✓ All dependencies verified')" && \
 		echo "5. Starting deployment..." && \
-		firebase deploy --only functions:python --debug
+		firebase deploy --only functions:python --debug && \
+		echo "=== Deployment Complete ==="
 
 deploy-rules:
 	@echo " Deploying firestore rules..."
