@@ -1,5 +1,7 @@
 from firebase_functions import firestore_fn
 from firebase_admin import initialize_app, storage
+from google.auth.transport.requests import Request
+from google.oauth2 import id_token
 import google.cloud.firestore
 import tempfile
 import os
@@ -7,6 +9,8 @@ from docx import Document
 import re
 import sys
 from pathlib import Path
+import requests
+
 
 # Add lib directory to Python path
 lib_path = str(Path(__file__).parent.parent / 'lib')
@@ -95,3 +99,60 @@ def extract_placeholders(docx_path: str) -> list:
                 placeholders.update(matches)
 
     return list(placeholders)
+
+# This function is triggered when a new document is created in the document_jobs collection
+# It calls the Cloud Run service to process the document
+@firestore_fn.on_document_created(document="document_jobs/{docId}")
+def process_document_job(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
+    snapshot = event.data
+    if not snapshot.exists:
+        print("Document no longer exists")
+        return
+
+    try:
+        # Get the document data
+        doc_data = snapshot.to_dict()
+        form_id = doc_data.get("formId")
+        
+        if not form_id:
+            print("No formId found in document")
+            return
+
+        print("ENVIRONMENT:", dict(os.environ))
+
+        # Get Cloud Run URL (set this in Firebase config)
+        cloud_run_url = os.environ.get("DOCGEN_URL")
+        if not cloud_run_url:
+            raise ValueError("DOCGEN_URL not set in Firebase config")
+        
+        # Prepare request to Cloud Run
+        headers = {
+            "Authorization": f"Bearer {get_cloud_run_token(cloud_run_url)}",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(
+            f"{cloud_run_url}/",
+            headers=headers,
+            json={"formId": form_id},
+            timeout=30
+        )
+
+        if response.status_code != 200:
+            print(f"Cloud Run request failed: {response.status_code} - {response.text}")
+        else:
+            print(f"Successfully processed form {form_id}")
+
+    except Exception as error:
+        print(f"Error processing document job: {error}")
+        raise
+
+def get_cloud_run_token(target_audience):
+    try:
+        # For Cloud Functions/Cloud Run environments
+        audience = target_audience
+        token = id_token.fetch_id_token(Request(), audience)
+        return token
+    except Exception as e:
+        print(f"Error getting ID token: {str(e)}")
+        raise

@@ -3,3 +3,5 @@ firebase-admin
 python-docx
 google-cloud-storage
 google-cloud-firestore
+requests
+google-auth
