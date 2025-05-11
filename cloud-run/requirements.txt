@@ -1,0 +1,7 @@
+firebase-admin
+python-docx
+google-cloud-storage
+google-cloud-firestore
+Flask
+gunicorn
+google-events
