@@ -118,8 +118,6 @@ def process_document_job(event: firestore_fn.Event[firestore_fn.DocumentSnapshot
             print("No formId found in document")
             return
 
-        print("ENVIRONMENT:", dict(os.environ))
-
         # Get Cloud Run URL (set this in Firebase config)
         cloud_run_url = os.environ.get("DOCGEN_URL")
         if not cloud_run_url:
