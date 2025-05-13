@@ -28,7 +28,7 @@ install:
 	${NPM} install
 
 # Build commands
-.PHONY: build-prod build-dev build-functions
+.PHONY: build-prod build-dev build-functions build-cloudrun
 build-prod: use-prod
 	@echo " Building for PRODUCTION..."
 	${NPM} run build -- --mode production
@@ -44,8 +44,12 @@ build-functions: check-env
 		echo "TypeScript build failed"; exit 1; \
 	fi
 
+build-cloudrun:
+	@echo "Building cloud run service..."
+	gcloud builds submit --tag gcr.io/doc-template-front-dev/doc-generator cloud-run/.
+
 # Deployment commands
-.PHONY: deploy-prod deploy-dev deploy-functions deploy-rules
+.PHONY: deploy-prod deploy-dev deploy-functions deploy-rules deploy-cloudrun
 deploy-prod: build-prod use-prod
 	@echo " Deploying to PRODUCTION (${PROD_PROJECT})..."
 	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET_PROD}
@@ -74,13 +78,24 @@ deploy-py-functions:
 		python3.10 -m pip install --upgrade pip && \
 		python3.10 -m pip install -r requirements.txt --no-cache-dir && \
 		echo "4. Verifying critical imports..." && \
-		python3.10 -c "from firebase_functions import https_fn; from docx import Document; from docx2pdf import convert; from google.cloud import storage; print('✓ All dependencies verified')" && \
+		python3.10 -c "from firebase_functions import firestore_fn, options; from firebase_admin import initialize_app, firestore, storage; from docx import Document; from google.cloud import storage as gcs; print('✓ All dependencies verified')" && \
 		echo "5. Starting deployment..." && \
-		firebase deploy --only functions:python --debug
+		firebase deploy --only functions:python --debug && \
+		echo "=== Deployment Complete ==="
 
 deploy-rules:
 	@echo " Deploying firestore rules..."
 	${FIREBASE} deploy --only firestore:rules
+
+deploy-cloudrun:
+	@echo " Deploying cloud run service..."
+	gcloud run deploy doc-generator \
+	--image=gcr.io/doc-template-front-dev/doc-generator \
+	--service-account=doc-generator-sa@doc-template-front-dev.iam.gserviceaccount.com \
+	--update-env-vars="JAVA_TOOL_OPTIONS=-Djava.awt.headless=true" \
+	--no-allow-unauthenticated \
+	--platform=managed \
+	--region=us-central1
 
 # Serve locally
 .PHONY: serve-prod serve-dev serve-dev-emulators
@@ -141,12 +156,14 @@ help:
 	@echo "  make build-prod        	- Build production version"
 	@echo "  make build-dev         	- Build development version"
 	@echo "  make build-functions   	- Build cloud functions"
+	@echo "  make build-cloudrun    	- Build cloud run service"
 	@echo "  make deploy-prod       	- Deploy to production"
 	@echo "  make deploy-dev        	- Deploy to dev"
 	@echo "  make deploy-functions  	- Deploy all cloud functions"
 	@echo "  make deploy-ts-functions  	- Deploy TypeScript cloud functions"
 	@echo "  make deploy-py-functions  	- Deploy Python cloud functions"
 	@echo "  make deploy-rules	    	- Deploy firestore rules"
+	@echo "  make deploy-cloudrun   	- Deploy cloud run service"
 	@echo "  make serve             	- Start local dev server"
 	@echo "  make serve-prod        	- Serve production build locally"
 	@echo "  make serve-dev         	- Serve dev build locally"

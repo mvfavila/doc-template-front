@@ -1,13 +1,16 @@
-from firebase_functions import firestore_fn, options
-from firebase_admin import initialize_app, firestore, storage
+from firebase_functions import firestore_fn
+from firebase_admin import initialize_app, storage
+from google.auth.transport.requests import Request
+from google.oauth2 import id_token
 import google.cloud.firestore
 import tempfile
 import os
 from docx import Document
-from docx2pdf import convert
 import re
 import sys
 from pathlib import Path
+import requests
+
 
 # Add lib directory to Python path
 lib_path = str(Path(__file__).parent.parent / 'lib')
@@ -21,7 +24,6 @@ initialize_app()
 def processtemplate(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
     """Extracts placeholders from uploaded template and updates document."""
     
-    # Get the newly created document
     snapshot = event.data
     if not snapshot.exists:
         print("Document no longer exists")
@@ -31,22 +33,18 @@ def processtemplate(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) ->
     template_id = event.params["templateId"]
 
     try:
-        # Update status to processing
         snapshot.reference.update({"status": "processing"})
 
-        # 1. Download the template file from Storage
         file_path = template_data["storagePath"]
         bucket_name = template_data["downloadURL"].split('/')[5]
         bucket = storage.bucket(bucket_name)
         
-        # Create a temporary file
         with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as temp_file:
             temp_path = temp_file.name
             blob = bucket.blob(file_path)
             blob.download_to_filename(temp_path)
             print(f"Downloaded template to {temp_path}")
 
-            # 2. Extract placeholders from the DOCX file
             placeholders = extract_placeholders(temp_path)
             print(f"Found placeholders: {placeholders}")
 
@@ -58,7 +56,6 @@ def processtemplate(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) ->
                 } for p in placeholders
             }
 
-            # 3. Update the template document with the placeholders
             snapshot.reference.update({
                 "placeholders": placeholder_config,
                 "status": "processed"
@@ -97,75 +94,54 @@ def extract_placeholders(docx_path: str) -> list:
 
     return list(placeholders)
 
-# Optional: Function to generate documents from template and data
-@firestore_fn.on_document_created(document="document_jobs/{jobId}")
-def generatedocuments(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
-    """Generates documents from template and provided data."""
-    
+# This function is triggered when a new document is created in the document_jobs collection
+# It calls the Cloud Run service to process the document
+@firestore_fn.on_document_created(document="document_jobs/{docId}")
+def process_document_job(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
     snapshot = event.data
     if not snapshot.exists:
         print("Document no longer exists")
         return
 
-    job_data = snapshot.to_dict()
-    template_ref = firestore.client().collection("templates").document(job_data["templateId"])
-    template_doc = template_ref.get()
-    template_data = template_doc.to_dict()
-
     try:
-        # Update job status
-        snapshot.reference.update({"status": "processing"})
-
-        # 1. Download the template
-        bucket_name = template_data["downloadURL"].split('/')[5]
-        bucket = storage.bucket(bucket_name)
+        # Get the document data
+        doc_data = snapshot.to_dict()
+        form_id = doc_data.get("formId")
         
-        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as temp_template:
-            template_path = temp_template.name
-            blob = bucket.blob(template_data["storagePath"])
-            blob.download_to_filename(template_path)
-            print(f"Downloaded template to {template_path}")
+        if not form_id:
+            print("No formId found in document")
+            return
 
-            # 2. Process each row of data (assuming data is in the job document)
-            for row in job_data["data_rows"]:
-                process_number = re.sub(r'[^\w\-_\.]', '_', row["NUMERO_DO_PROCESSO"])
-                
-                # Create filled document
-                doc = Document(template_path)
-                for paragraph in doc.paragraphs:
-                    for key, value in row.items():
-                        placeholder = f"{{{key}}}"
-                        if placeholder in paragraph.text:
-                            paragraph.text = paragraph.text.replace(placeholder, str(value))
-                
-                # Save filled DOCX
-                output_docx = f"{process_number}_{template_data['name']}.docx"
-                doc.save(output_docx)
-                
-                # Convert to PDF
-                convert(output_docx)
-                output_pdf = output_docx.replace(".docx", ".pdf")
-                print(f"Generated files: {output_docx} and {output_pdf}")
+        cloud_run_url = os.environ.get("DOCGEN_URL")
+        if not cloud_run_url:
+            raise ValueError("DOCGEN_URL not set in Firebase config")
+        
+        headers = {
+            "Authorization": f"Bearer {get_cloud_run_token(cloud_run_url)}",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(
+            f"{cloud_run_url}/",
+            headers=headers,
+            json={"formId": form_id},
+            timeout=30
+        )
 
-                # Upload to Storage
-                output_bucket = storage.bucket("your-output-bucket-name")
-                for file in [output_docx, output_pdf]:
-                    blob = output_bucket.blob(f"processed_documents/{file}")
-                    blob.upload_from_filename(file)
-                    os.remove(file)
-
-        # Update job status
-        snapshot.reference.update({"status": "completed"})
+        if response.status_code != 200:
+            print(f"Cloud Run request failed: {response.status_code} - {response.text}")
+        else:
+            print(f"Successfully processed form {form_id}")
 
     except Exception as error:
-        print(f"Error generating documents: {error}")
-        snapshot.reference.update({
-            "status": "error",
-            "error": str(error)
-        })
+        print(f"Error processing document job: {error}")
         raise
 
-    finally:
-        # Clean up temporary files
-        if 'template_path' in locals() and os.path.exists(template_path):
-            os.remove(template_path)
+def get_cloud_run_token(target_audience):
+    try:
+        audience = target_audience
+        token = id_token.fetch_id_token(Request(), audience)
+        return token
+    except Exception as e:
+        print(f"Error getting ID token: {str(e)}")
+        raise

@@ -36,5 +36,6 @@
 
 ## Quick Links
 ▶️ [How-to Guides](docs/readme/howto/README.md)  
+▶️ [Requirements](docs/readme/requirements/README.md)  
 
 > **Note:** All role permissions are enforced through Firebase Authentication custom claims and Firestore Security Rules.

@@ -1,7 +1,7 @@
-firebase-functions
 firebase-admin
 python-docx
 google-cloud-storage
 google-cloud-firestore
-requests
-google-auth
+flask
+gunicorn
+google-events
