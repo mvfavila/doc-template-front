@@ -78,6 +78,10 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import FormField from '@/components/FormField.vue';
 import type { PlaceholderConfig, Placeholders } from '@/shared/placeholder';
+import {
+    collection,
+    addDoc
+} from 'firebase/firestore'
 
 const props = defineProps({
   form: {
@@ -206,10 +210,14 @@ const generateDocuments = async () => {
       status: 'approved',
       updatedAt: serverTimestamp()
     });
+
+    await addDoc(collection(db, 'document_jobs'), {
+      formId: props.form.id,
+      createdAt: serverTimestamp()
+    });
     
     emit('saved');
     emit('close');
-    alert('Documentos gerados com sucesso!');
   } catch (error) {
     console.error('Error generating documents:', error);
   } finally {

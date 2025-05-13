@@ -28,6 +28,11 @@ service cloud.firestore {
                         && getUserData(request.auth.uid).role == 'office_admin';
     }
     
+    match /document_jobs/{jobId} {
+      allow create: if isOfficeAdmin();
+      allow read: if false;
+    }
+    
     match /admins/{uid} {
       allow read, write: if false; // should never be changed
     }
