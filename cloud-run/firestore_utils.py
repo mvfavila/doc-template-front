@@ -88,7 +88,7 @@ def upload_result(form_id: str, output_pdf_path: str) -> str:
 
 def generate_signed_url(blob_path: str, expiration_hours: int = 1) -> str:
     """Generate a temporary access URL"""
-    bucket = storage_client.bucket("doc-template-front-dev.appspot.com")
+    bucket = storage_client.bucket("doc-template-front-dev.firebasestorage.app")
     blob = bucket.blob(blob_path)
     
     url = blob.generate_signed_url(

@@ -2,6 +2,6 @@ firebase-admin
 python-docx
 google-cloud-storage
 google-cloud-firestore
-Flask
+flask
 gunicorn
 google-events
