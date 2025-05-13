@@ -24,7 +24,6 @@ initialize_app()
 def processtemplate(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
     """Extracts placeholders from uploaded template and updates document."""
     
-    # Get the newly created document
     snapshot = event.data
     if not snapshot.exists:
         print("Document no longer exists")
@@ -34,22 +33,18 @@ def processtemplate(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) ->
     template_id = event.params["templateId"]
 
     try:
-        # Update status to processing
         snapshot.reference.update({"status": "processing"})
 
-        # 1. Download the template file from Storage
         file_path = template_data["storagePath"]
         bucket_name = template_data["downloadURL"].split('/')[5]
         bucket = storage.bucket(bucket_name)
         
-        # Create a temporary file
         with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as temp_file:
             temp_path = temp_file.name
             blob = bucket.blob(file_path)
             blob.download_to_filename(temp_path)
             print(f"Downloaded template to {temp_path}")
 
-            # 2. Extract placeholders from the DOCX file
             placeholders = extract_placeholders(temp_path)
             print(f"Found placeholders: {placeholders}")
 
@@ -61,7 +56,6 @@ def processtemplate(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) ->
                 } for p in placeholders
             }
 
-            # 3. Update the template document with the placeholders
             snapshot.reference.update({
                 "placeholders": placeholder_config,
                 "status": "processed"
@@ -118,12 +112,10 @@ def process_document_job(event: firestore_fn.Event[firestore_fn.DocumentSnapshot
             print("No formId found in document")
             return
 
-        # Get Cloud Run URL (set this in Firebase config)
         cloud_run_url = os.environ.get("DOCGEN_URL")
         if not cloud_run_url:
             raise ValueError("DOCGEN_URL not set in Firebase config")
         
-        # Prepare request to Cloud Run
         headers = {
             "Authorization": f"Bearer {get_cloud_run_token(cloud_run_url)}",
             "Content-Type": "application/json"
@@ -147,7 +139,6 @@ def process_document_job(event: firestore_fn.Event[firestore_fn.DocumentSnapshot
 
 def get_cloud_run_token(target_audience):
     try:
-        # For Cloud Functions/Cloud Run environments
         audience = target_audience
         token = id_token.fetch_id_token(Request(), audience)
         return token

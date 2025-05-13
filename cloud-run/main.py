@@ -13,7 +13,6 @@ def handle_firestore_event():
     print("Received event:", request.json)
 
     if request.method == 'OPTIONS':
-        # Handle preflight request
         response = jsonify({'status': 'preflight'})
         response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
         response.headers.add('Access-Control-Allow-Headers', 'Authorization, Content-Type')
@@ -27,7 +26,6 @@ def handle_firestore_event():
         return response, 400
 
     try:
-        # Extract formId (or other relevant fields)
         form_id = doc_data.get("formId")
         if not form_id:
             response = jsonify({"error": "formId is required"})
@@ -36,7 +34,6 @@ def handle_firestore_event():
         
         logger.info(f"Processing new document job for form: {form_id}")
 
-        # Call your existing processing logic
         form_data = firestore_utils.fetch_form_data(form_id)
         template_path = firestore_utils.download_template(form_data)
         output_pdf = libreoffice_utils.convert_to_pdf(template_path)
