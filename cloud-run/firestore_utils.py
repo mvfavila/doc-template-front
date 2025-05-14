@@ -17,11 +17,11 @@ def fetch_form_data(form_id: str) -> dict:
         doc_ref = db.collection("forms").document(form_id)
         doc = doc_ref.get()
         if not doc.exists:
-            logger.error(f"Form {form_id} not found")
+            print(f"Form {form_id} not found")
             return None
         return doc.to_dict()
     except Exception as e:
-        logger.error(f"Error fetching form data: {str(e)}", exc_info=True)
+        print(f"Error fetching form data: {str(e)}", exc_info=True)
         raise
 
 def download_template(form_data: dict) -> str:
@@ -40,17 +40,22 @@ def download_template(form_data: dict) -> str:
         bucket_name = template_data["downloadURL"].split('/')[5]
         blob_path = template_data["storagePath"]
 
-        # Download to a temporary file
-        bucket = storage_client.bucket(bucket_name)
-        blob = bucket.blob(blob_path)
-        
-        with NamedTemporaryFile(suffix=".docx", delete=False) as temp_file:
-            blob.download_to_filename(temp_file.name)
-            logger.info(f"Downloaded template to {temp_file.name}")
-            return temp_file.name
+        try:
+            # Download to a temporary file
+            bucket = storage_client.bucket(bucket_name)
+            blob = bucket.blob(blob_path)
+            
+            with NamedTemporaryFile(suffix=".docx", delete=False) as temp_file:
+                blob.download_to_filename(temp_file.name)
+                logger.info(f"Downloaded template to {temp_file.name}")
+                return temp_file.name
+            
+        except Exception as storage_error:
+            print(f"Storage access error: {str(storage_error)}")
+            raise PermissionError(f"Access denied to template storage. Please check service account permissions.")
 
     except Exception as e:
-        logger.error(f"Error downloading template: {str(e)}", exc_info=True)
+        print(f"Error downloading template: {str(e)}")
         raise
 
 def upload_result(form_id: str, output_pdf_path: str) -> str:
@@ -59,7 +64,7 @@ def upload_result(form_id: str, output_pdf_path: str) -> str:
 
         bucket_name = os.getenv("OUTPUT_BUCKET", "")
         if not bucket_name:
-            bucket_name = "doc-template-front-dev.firebasestorage.app"
+            raise ValueError("OUTPUT_BUCKET environment variable not set")
 
         bucket = storage_client.bucket(bucket_name)
         
