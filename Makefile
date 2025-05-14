@@ -46,7 +46,7 @@ build-functions: check-env
 
 build-cloudrun:
 	@echo "Building cloud run service..."
-	gcloud builds submit --tag gcr.io/doc-template-front-dev/doc-generator cloud-run/.
+	gcloud builds submit --tag gcr.io/${DEV_PROJECT}/doc-generator cloud-run/.
 
 # Deployment commands
 .PHONY: deploy-prod deploy-dev deploy-functions deploy-rules deploy-cloudrun
@@ -87,15 +87,16 @@ deploy-rules:
 	@echo " Deploying firestore rules..."
 	${FIREBASE} deploy --only firestore:rules
 
-deploy-cloudrun:
+deploy-cloudrun: build-cloudrun
 	@echo " Deploying cloud run service..."
 	gcloud run deploy doc-generator \
-	--image=gcr.io/doc-template-front-dev/doc-generator \
-	--service-account=doc-generator-sa@doc-template-front-dev.iam.gserviceaccount.com \
-	--update-env-vars="JAVA_TOOL_OPTIONS=-Djava.awt.headless=true" \
+	--image=gcr.io/${DEV_PROJECT}/doc-generator \
+	--service-account=${SA_DOC_GENERATOR_DEV} \
 	--no-allow-unauthenticated \
 	--platform=managed \
-	--region=us-central1
+	--region=us-central1 \
+	--set-env-vars="JAVA_TOOL_OPTIONS=-Djava.awt.headless=true" \
+	--set-env-vars=OUTPUT_BUCKET=${DOC_TEMPLATE_FIREBASE_BUCKET_DEV}
 
 # Serve locally
 .PHONY: serve-prod serve-dev serve-dev-emulators
