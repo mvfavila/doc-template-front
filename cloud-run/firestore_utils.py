@@ -93,7 +93,12 @@ def upload_result(form_id: str, output_pdf_path: str) -> str:
 
 def generate_signed_url(blob_path: str, expiration_hours: int = 1) -> str:
     """Generate a temporary access URL"""
-    bucket = storage_client.bucket("doc-template-front-dev.firebasestorage.app")
+
+    bucket_name = os.getenv("OUTPUT_BUCKET", "")
+    if not bucket_name:
+        raise ValueError("OUTPUT_BUCKET environment variable not set")
+    
+    bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(blob_path)
     
     url = blob.generate_signed_url(
