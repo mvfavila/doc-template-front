@@ -456,10 +456,6 @@ const uploadTemplate = async () => {
     const userDoc = await getDoc(doc(db, "users", user.uid));
     if (!userDoc.exists()) throw new Error("Dados do usuário não encontrados");
 
-    auth.currentUser.getIdTokenResult().then((idTokenResult) => {
-      console.log('Claims:', idTokenResult.claims);
-    });
-
     // Sanitize filename
     const sanitizedFileName = selectedFile.value.name
       .replace(/[^\w.-]/g, '_') // Replace special chars
