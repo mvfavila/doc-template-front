@@ -11,6 +11,19 @@ DEPLOY_TARGET_DEV = dev
 PYTHON := python3
 PIP := pip3
 
+# Usage: make deploy-cloudrun ENV=prod
+ENV ?= dev  # Default to dev
+
+ifeq ($(ENV),prod)
+	PROJECT := $(PROD_PROJECT)
+	SA_DOC_GENERATOR := $(SA_DOC_GENERATOR_PROD)
+	DOC_TEMPLATE_FIREBASE_BUCKET := $(DOC_TEMPLATE_FIREBASE_BUCKET_PROD)
+else
+	PROJECT := $(DEV_PROJECT)
+	SA_DOC_GENERATOR := $(SA_DOC_GENERATOR_DEV)
+	DOC_TEMPLATE_FIREBASE_BUCKET := $(DOC_TEMPLATE_FIREBASE_BUCKET_DEV)
+endif
+
 # Environment setup
 .PHONY: use-prod use-dev
 use-prod:
@@ -46,7 +59,7 @@ build-functions: check-env
 
 build-cloudrun:
 	@echo "Building cloud run service..."
-	gcloud builds submit --tag gcr.io/${DEV_PROJECT}/doc-generator cloud-run/.
+	gcloud builds submit --tag gcr.io/${PROJECT}/doc-generator cloud-run/.
 
 # Deployment commands
 .PHONY: deploy-prod deploy-dev deploy-functions deploy-rules deploy-cloudrun
@@ -90,13 +103,13 @@ deploy-rules:
 deploy-cloudrun: build-cloudrun
 	@echo " Deploying cloud run service..."
 	gcloud run deploy doc-generator \
-	--image=gcr.io/${DEV_PROJECT}/doc-generator \
-	--service-account=${SA_DOC_GENERATOR_DEV} \
+	--image=gcr.io/${PROJECT}/doc-generator \
+	--service-account=${SA_DOC_GENERATOR} \
 	--no-allow-unauthenticated \
 	--platform=managed \
 	--region=us-central1 \
 	--set-env-vars="JAVA_TOOL_OPTIONS=-Djava.awt.headless=true" \
-	--set-env-vars=OUTPUT_BUCKET=${DOC_TEMPLATE_FIREBASE_BUCKET_DEV}
+	--set-env-vars=OUTPUT_BUCKET=${DOC_TEMPLATE_FIREBASE_BUCKET}
 
 # Serve locally
 .PHONY: serve-prod serve-dev serve-dev-emulators
@@ -153,23 +166,24 @@ check-env:
 .PHONY: help
 help:
 	@echo "Available commands:"
-	@echo "  make install           	- Install dependencies"
-	@echo "  make build-prod        	- Build production version"
-	@echo "  make build-dev         	- Build development version"
-	@echo "  make build-functions   	- Build cloud functions"
-	@echo "  make build-cloudrun    	- Build cloud run service"
-	@echo "  make deploy-prod       	- Deploy to production"
-	@echo "  make deploy-dev        	- Deploy to dev"
-	@echo "  make deploy-functions  	- Deploy all cloud functions"
-	@echo "  make deploy-ts-functions  	- Deploy TypeScript cloud functions"
-	@echo "  make deploy-py-functions  	- Deploy Python cloud functions"
-	@echo "  make deploy-rules	    	- Deploy firestore rules"
-	@echo "  make deploy-cloudrun   	- Deploy cloud run service"
-	@echo "  make serve             	- Start local dev server"
-	@echo "  make serve-prod        	- Serve production build locally"
-	@echo "  make serve-dev         	- Serve dev build locally"
-	@echo "  make clean             	- Remove build artifacts"
-	@echo "  make use-prod          	- Switch to production Firebase project"
-	@echo "  make use-dev           	- Switch to dev Firebase project"
-	@echo "  make run-emulators     	- Run emulators for dev"
-	@echo "  make export-data       	- Export data from emulators"
+	@echo "  make install           			- Install dependencies"
+	@echo "  make build-prod        			- Build production version"
+	@echo "  make build-dev         			- Build development version"
+	@echo "  make build-functions   			- Build cloud functions"
+	@echo "  make build-cloudrun    			- Build cloud run service"
+	@echo "  make deploy-prod       			- Deploy to production"
+	@echo "  make deploy-dev        			- Deploy to dev"
+	@echo "  make deploy-functions  			- Deploy all cloud functions"
+	@echo "  make deploy-ts-functions  			- Deploy TypeScript cloud functions"
+	@echo "  make deploy-py-functions  			- Deploy Python cloud functions"
+	@echo "  make deploy-rules	    			- Deploy firestore rules"
+	@echo "  make deploy-cloudrun ENV=dev  		- Deploy cloud run service to dev"
+	@echo "  make deploy-cloudrun ENV=prod  	- Deploy cloud run service to prod"
+	@echo "  make serve             			- Start local dev server"
+	@echo "  make serve-prod        			- Serve production build locally"
+	@echo "  make serve-dev         			- Serve dev build locally"
+	@echo "  make clean             			- Remove build artifacts"
+	@echo "  make use-prod          			- Switch to production Firebase project"
+	@echo "  make use-dev           			- Switch to dev Firebase project"
+	@echo "  make run-emulators     			- Run emulators for dev"
+	@echo "  make export-data       			- Export data from emulators"
