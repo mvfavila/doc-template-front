@@ -7,6 +7,9 @@ NPM = npm
 FIREBASE = firebase
 DEPLOY_TARGET_PROD = production
 DEPLOY_TARGET_DEV = dev
+DEPLOY_TARGET_FULL_DEV = development
+SERVE_MODE_DEV = dev:live
+SERVE_MODE_PROD = preview
 
 PYTHON := python3
 PIP := pip3
@@ -18,10 +21,14 @@ ifeq ($(ENV),prod)
 	PROJECT := $(PROD_PROJECT)
 	SA_DOC_GENERATOR := $(SA_DOC_GENERATOR_PROD)
 	DOC_TEMPLATE_FIREBASE_BUCKET := $(DOC_TEMPLATE_FIREBASE_BUCKET_PROD)
+	DEPLOY_TARGET := $(DEPLOY_TARGET_PROD)
+	SERVE_MODE := $(SERVE_MODE_PROD)
 else
 	PROJECT := $(DEV_PROJECT)
 	SA_DOC_GENERATOR := $(SA_DOC_GENERATOR_DEV)
 	DOC_TEMPLATE_FIREBASE_BUCKET := $(DOC_TEMPLATE_FIREBASE_BUCKET_DEV)
+	DEPLOY_TARGET := $(DEPLOY_TARGET_FULL_DEV)
+	SERVE_MODE := $(SERVE_MODE_DEV)
 endif
 
 # Environment setup
@@ -41,16 +48,16 @@ install:
 	${NPM} install
 
 # Build commands
-.PHONY: build-prod build-dev build-functions build-cloudrun
-build-prod: use-prod
-	@echo " Building for PRODUCTION..."
-	${NPM} run build -- --mode production
-
-build-dev: use-dev
-	@echo " Building for DEVELOPMENT..."
-	${NPM} run build -- --mode development
+.PHONY: build-functions build-cloudrun build-frontend
+build-frontend:
+	@echo " Switching to ${DEPLOY_TARGET} project: ${PROJECT}"
+	${FIREBASE} use ${PROJECT}
+	@echo " Building frontend for ${DEPLOY_TARGET}..."
+	${NPM} run build -- --mode ${DEPLOY_TARGET}
 
 build-functions: check-env
+	@echo " Switching to ${DEPLOY_TARGET} project: ${PROJECT}"
+	${FIREBASE} use ${PROJECT}
 	@echo "Building all functions..."
 	@echo "Building TypeScript functions..."
 	@if ! npm --prefix 'functions' run build; then \
@@ -58,18 +65,16 @@ build-functions: check-env
 	fi
 
 build-cloudrun:
+	@echo " Switching to ${DEPLOY_TARGET} project: ${PROJECT}"
+	${FIREBASE} use ${PROJECT}
 	@echo "Building cloud run service..."
 	gcloud builds submit --tag gcr.io/${PROJECT}/doc-generator cloud-run/.
 
 # Deployment commands
-.PHONY: deploy-prod deploy-dev deploy-functions deploy-rules deploy-cloudrun
-deploy-prod: build-prod use-prod
-	@echo " Deploying to PRODUCTION (${PROD_PROJECT})..."
-	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET_PROD}
-
-deploy-dev: build-dev use-dev
-	@echo " Deploying to DEV (${DEV_PROJECT})..."
-	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET_DEV}
+.PHONY: deploy-functions deploy-rules deploy-cloudrun deploy-frontend
+deploy-frontend: build-frontend
+	@echo " Deploying to ${DEPLOY_TARGET} (${PROJECT})..."
+	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET}
 
 deploy-functions: deploy-ts-functions deploy-py-functions
 	@echo "✓ All functions deployed successfully"
@@ -97,6 +102,8 @@ deploy-py-functions:
 		echo "=== Deployment Complete ==="
 
 deploy-rules:
+	@echo " Switching to ${DEPLOY_TARGET} project: ${PROJECT}"
+	${FIREBASE} use ${PROJECT}
 	@echo " Deploying firestore rules..."
 	${FIREBASE} deploy --only firestore:rules
 
@@ -112,16 +119,12 @@ deploy-cloudrun: build-cloudrun
 	--set-env-vars=OUTPUT_BUCKET=${DOC_TEMPLATE_FIREBASE_BUCKET}
 
 # Serve locally
-.PHONY: serve-prod serve-dev serve-dev-emulators
-serve-prod: build-prod
-	@echo " Serving production build locally..."
-	${NPM} run preview
+.PHONY: serve-dev-emulators serve
+serve: build-frontend
+	@echo " Serving ${DEPLOY_TARGET} frontend locally..."
+	${NPM} run ${SERVE_MODE}
 
-serve-dev: build-dev
-	@echo " Serving dev build locally..."
-	${NPM} run dev:live
-
-serve-dev-emulators: build-dev
+serve-dev-emulators: build-frontend ENV=dev
 	@echo " Serving dev build locally (with emulators)..."
 	${NPM} run dev:emulators
 
@@ -167,12 +170,8 @@ check-env:
 help:
 	@echo "Available commands:"
 	@echo "  make install           			- Install dependencies"
-	@echo "  make build-prod        			- Build production version"
-	@echo "  make build-dev         			- Build development version"
 	@echo "  make build-functions   			- Build cloud functions"
 	@echo "  make build-cloudrun    			- Build cloud run service"
-	@echo "  make deploy-prod       			- Deploy to production"
-	@echo "  make deploy-dev        			- Deploy to dev"
 	@echo "  make deploy-functions  			- Deploy all cloud functions"
 	@echo "  make deploy-ts-functions  			- Deploy TypeScript cloud functions"
 	@echo "  make deploy-py-functions  			- Deploy Python cloud functions"
@@ -180,8 +179,6 @@ help:
 	@echo "  make deploy-cloudrun ENV=dev  		- Deploy cloud run service to dev"
 	@echo "  make deploy-cloudrun ENV=prod  	- Deploy cloud run service to prod"
 	@echo "  make serve             			- Start local dev server"
-	@echo "  make serve-prod        			- Serve production build locally"
-	@echo "  make serve-dev         			- Serve dev build locally"
 	@echo "  make clean             			- Remove build artifacts"
 	@echo "  make use-prod          			- Switch to production Firebase project"
 	@echo "  make use-dev           			- Switch to dev Firebase project"
