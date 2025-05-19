@@ -32,14 +32,22 @@ else
 endif
 
 # Environment setup
-.PHONY: use-prod use-dev
+.PHONY: use-prod use-dev use-env
 use-prod:
-	@echo " Switching to PRODUCTION project: ${PROD_PROJECT}"
+	@echo " Switching Firebase CLI to PRODUCTION project: ${PROD_PROJECT}"
 	${FIREBASE} use ${PROD_PROJECT}
+	@echo " Switching GCloud CLI to PRODUCTION project: ${PROD_PROJECT}"
+	gcloud config set project PROJECT_ID
 
 use-dev:
 	@echo " Switching to DEV project: ${DEV_PROJECT}"
 	${FIREBASE} use ${DEV_PROJECT}
+
+use-env:
+	@echo " Switching to ${DEPLOY_TARGET} project: ${PROJECT}"
+	${FIREBASE} use ${PROJECT}
+	@echo " Switching GCloud CLI to ${DEPLOY_TARGET} project: ${PROJECT}"
+	gcloud config set project ${PROJECT}
 
 # Install dependencies
 .PHONY: install
@@ -49,26 +57,20 @@ install:
 
 # Build commands
 .PHONY: build-functions build-cloudrun build-frontend
-build-frontend:
-	@echo " Switching to ${DEPLOY_TARGET} project: ${PROJECT}"
-	${FIREBASE} use ${PROJECT}
+build-frontend: use-env
 	@echo " Building frontend for ${DEPLOY_TARGET}..."
 	${NPM} run build -- --mode ${DEPLOY_TARGET}
 
-build-functions: check-env
-	@echo " Switching to ${DEPLOY_TARGET} project: ${PROJECT}"
-	${FIREBASE} use ${PROJECT}
+build-functions: check-env use-env
 	@echo "Building all functions..."
 	@echo "Building TypeScript functions..."
 	@if ! npm --prefix 'functions' run build; then \
 		echo "TypeScript build failed"; exit 1; \
 	fi
 
-build-cloudrun:
-	@echo " Switching to ${DEPLOY_TARGET} project: ${PROJECT}"
-	${FIREBASE} use ${PROJECT}
+build-cloudrun: use-env
 	@echo "Building cloud run service..."
-	gcloud builds submit --tag gcr.io/${PROJECT}/doc-generator cloud-run/.
+	gcloud builds submit --tag us-central1-docker.pkg.dev/${PROJECT}/cloud-run-repo/doc-generator cloud-run/.
 
 # Deployment commands
 .PHONY: deploy-functions deploy-rules deploy-cloudrun deploy-frontend
@@ -101,16 +103,14 @@ deploy-py-functions:
 		firebase deploy --only functions:python --debug && \
 		echo "=== Deployment Complete ==="
 
-deploy-rules:
-	@echo " Switching to ${DEPLOY_TARGET} project: ${PROJECT}"
-	${FIREBASE} use ${PROJECT}
+deploy-rules: use-env
 	@echo " Deploying firestore rules..."
 	${FIREBASE} deploy --only firestore:rules
 
 deploy-cloudrun: build-cloudrun
 	@echo " Deploying cloud run service..."
 	gcloud run deploy doc-generator \
-	--image=gcr.io/${PROJECT}/doc-generator \
+	--image=us-central1-docker.pkg.dev/${PROJECT}/cloud-run-repo/doc-generator \
 	--service-account=${SA_DOC_GENERATOR} \
 	--no-allow-unauthenticated \
 	--platform=managed \
@@ -182,5 +182,6 @@ help:
 	@echo "  make clean             			- Remove build artifacts"
 	@echo "  make use-prod          			- Switch to production Firebase project"
 	@echo "  make use-dev           			- Switch to dev Firebase project"
+	@echo "  make use-env           			- Switch to given Firebase and GCloud project"
 	@echo "  make run-emulators     			- Run emulators for dev"
 	@echo "  make export-data       			- Export data from emulators"

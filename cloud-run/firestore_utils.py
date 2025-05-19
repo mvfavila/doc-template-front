@@ -108,6 +108,7 @@ def generate_signed_url(blob_path: str, expiration_hours: int = 1) -> str:
         allowed_origins=[
             "http://localhost:5173",
             "https://doc-template-front-dev.web.app"
+            "https://doc-template-front.web.app"
         ]
     )
     return url

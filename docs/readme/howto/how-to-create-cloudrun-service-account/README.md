@@ -1,4 +1,4 @@
-# How to Create a cloud run service account
+# How to Create a cloud run service
 
 This is aimed at the service account which is used in Form generation currently done by a cloud run service.
 
@@ -10,7 +10,18 @@ This is aimed at the service account which is used in Form generation currently 
 |[PROJECT_ID] | doc-generator-dev |
 |[BUCKET] | doc-generator-dev.firebasestorage.app |
 
-## Step-by-Step Instructions
+## Create artifact registry repository - Step-by-Step Instructions
+
+1. **Select project** using something like `make use-dev`
+2. **Create artifact registry repository** by running:
+    ```
+    gcloud artifacts repositories create cloud-run-repo \
+        --repository-format=docker \
+        --location=us-central1 \
+        --description="Docker repository for Cloud Run"
+    ```
+
+## Create service account - Step-by-Step Instructions
 
 1. **Select project** using something like `make use-dev`
 2. **Create service account** by running:
