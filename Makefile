@@ -7,19 +7,47 @@ NPM = npm
 FIREBASE = firebase
 DEPLOY_TARGET_PROD = production
 DEPLOY_TARGET_DEV = dev
+DEPLOY_TARGET_FULL_DEV = development
+SERVE_MODE_DEV = dev:live
+SERVE_MODE_PROD = preview
 
 PYTHON := python3
 PIP := pip3
 
+# Usage: make deploy-cloudrun ENV=prod
+ENV ?= dev  # Default to dev
+
+ifeq ($(ENV),prod)
+	PROJECT := $(PROD_PROJECT)
+	SA_DOC_GENERATOR := $(SA_DOC_GENERATOR_PROD)
+	DOC_TEMPLATE_FIREBASE_BUCKET := $(DOC_TEMPLATE_FIREBASE_BUCKET_PROD)
+	DEPLOY_TARGET := $(DEPLOY_TARGET_PROD)
+	SERVE_MODE := $(SERVE_MODE_PROD)
+else
+	PROJECT := $(DEV_PROJECT)
+	SA_DOC_GENERATOR := $(SA_DOC_GENERATOR_DEV)
+	DOC_TEMPLATE_FIREBASE_BUCKET := $(DOC_TEMPLATE_FIREBASE_BUCKET_DEV)
+	DEPLOY_TARGET := $(DEPLOY_TARGET_FULL_DEV)
+	SERVE_MODE := $(SERVE_MODE_DEV)
+endif
+
 # Environment setup
-.PHONY: use-prod use-dev
+.PHONY: use-prod use-dev use-env
 use-prod:
-	@echo " Switching to PRODUCTION project: ${PROD_PROJECT}"
+	@echo " Switching Firebase CLI to PRODUCTION project: ${PROD_PROJECT}"
 	${FIREBASE} use ${PROD_PROJECT}
+	@echo " Switching GCloud CLI to PRODUCTION project: ${PROD_PROJECT}"
+	gcloud config set project PROJECT_ID
 
 use-dev:
 	@echo " Switching to DEV project: ${DEV_PROJECT}"
 	${FIREBASE} use ${DEV_PROJECT}
+
+use-env:
+	@echo " Switching to ${DEPLOY_TARGET} project: ${PROJECT}"
+	${FIREBASE} use ${PROJECT}
+	@echo " Switching GCloud CLI to ${DEPLOY_TARGET} project: ${PROJECT}"
+	gcloud config set project ${PROJECT}
 
 # Install dependencies
 .PHONY: install
@@ -28,35 +56,27 @@ install:
 	${NPM} install
 
 # Build commands
-.PHONY: build-prod build-dev build-functions build-cloudrun
-build-prod: use-prod
-	@echo " Building for PRODUCTION..."
-	${NPM} run build -- --mode production
+.PHONY: build-functions build-cloudrun build-frontend
+build-frontend: use-env
+	@echo " Building frontend for ${DEPLOY_TARGET}..."
+	${NPM} run build -- --mode ${DEPLOY_TARGET}
 
-build-dev: use-dev
-	@echo " Building for DEVELOPMENT..."
-	${NPM} run build -- --mode development
-
-build-functions: check-env
+build-functions: check-env use-env
 	@echo "Building all functions..."
 	@echo "Building TypeScript functions..."
 	@if ! npm --prefix 'functions' run build; then \
 		echo "TypeScript build failed"; exit 1; \
 	fi
 
-build-cloudrun:
+build-cloudrun: use-env
 	@echo "Building cloud run service..."
-	gcloud builds submit --tag gcr.io/${DEV_PROJECT}/doc-generator cloud-run/.
+	gcloud builds submit --tag us-central1-docker.pkg.dev/${PROJECT}/cloud-run-repo/doc-generator cloud-run/.
 
 # Deployment commands
-.PHONY: deploy-prod deploy-dev deploy-functions deploy-rules deploy-cloudrun
-deploy-prod: build-prod use-prod
-	@echo " Deploying to PRODUCTION (${PROD_PROJECT})..."
-	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET_PROD}
-
-deploy-dev: build-dev use-dev
-	@echo " Deploying to DEV (${DEV_PROJECT})..."
-	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET_DEV}
+.PHONY: deploy-functions deploy-rules deploy-cloudrun deploy-frontend
+deploy-frontend: build-frontend
+	@echo " Deploying to ${DEPLOY_TARGET} (${PROJECT})..."
+	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET}
 
 deploy-functions: deploy-ts-functions deploy-py-functions
 	@echo "✓ All functions deployed successfully"
@@ -83,32 +103,28 @@ deploy-py-functions:
 		firebase deploy --only functions:python --debug && \
 		echo "=== Deployment Complete ==="
 
-deploy-rules:
+deploy-rules: use-env
 	@echo " Deploying firestore rules..."
 	${FIREBASE} deploy --only firestore:rules
 
 deploy-cloudrun: build-cloudrun
 	@echo " Deploying cloud run service..."
 	gcloud run deploy doc-generator \
-	--image=gcr.io/${DEV_PROJECT}/doc-generator \
-	--service-account=${SA_DOC_GENERATOR_DEV} \
+	--image=us-central1-docker.pkg.dev/${PROJECT}/cloud-run-repo/doc-generator \
+	--service-account=${SA_DOC_GENERATOR} \
 	--no-allow-unauthenticated \
 	--platform=managed \
 	--region=us-central1 \
 	--set-env-vars="JAVA_TOOL_OPTIONS=-Djava.awt.headless=true" \
-	--set-env-vars=OUTPUT_BUCKET=${DOC_TEMPLATE_FIREBASE_BUCKET_DEV}
+	--set-env-vars=OUTPUT_BUCKET=${DOC_TEMPLATE_FIREBASE_BUCKET}
 
 # Serve locally
-.PHONY: serve-prod serve-dev serve-dev-emulators
-serve-prod: build-prod
-	@echo " Serving production build locally..."
-	${NPM} run preview
+.PHONY: serve-dev-emulators serve
+serve: build-frontend
+	@echo " Serving ${DEPLOY_TARGET} frontend locally..."
+	${NPM} run ${SERVE_MODE}
 
-serve-dev: build-dev
-	@echo " Serving dev build locally..."
-	${NPM} run dev:live
-
-serve-dev-emulators: build-dev
+serve-dev-emulators: build-frontend ENV=dev
 	@echo " Serving dev build locally (with emulators)..."
 	${NPM} run dev:emulators
 
@@ -153,23 +169,19 @@ check-env:
 .PHONY: help
 help:
 	@echo "Available commands:"
-	@echo "  make install           	- Install dependencies"
-	@echo "  make build-prod        	- Build production version"
-	@echo "  make build-dev         	- Build development version"
-	@echo "  make build-functions   	- Build cloud functions"
-	@echo "  make build-cloudrun    	- Build cloud run service"
-	@echo "  make deploy-prod       	- Deploy to production"
-	@echo "  make deploy-dev        	- Deploy to dev"
-	@echo "  make deploy-functions  	- Deploy all cloud functions"
-	@echo "  make deploy-ts-functions  	- Deploy TypeScript cloud functions"
-	@echo "  make deploy-py-functions  	- Deploy Python cloud functions"
-	@echo "  make deploy-rules	    	- Deploy firestore rules"
-	@echo "  make deploy-cloudrun   	- Deploy cloud run service"
-	@echo "  make serve             	- Start local dev server"
-	@echo "  make serve-prod        	- Serve production build locally"
-	@echo "  make serve-dev         	- Serve dev build locally"
-	@echo "  make clean             	- Remove build artifacts"
-	@echo "  make use-prod          	- Switch to production Firebase project"
-	@echo "  make use-dev           	- Switch to dev Firebase project"
-	@echo "  make run-emulators     	- Run emulators for dev"
-	@echo "  make export-data       	- Export data from emulators"
+	@echo "  make install           			- Install dependencies"
+	@echo "  make build-functions   			- Build cloud functions"
+	@echo "  make build-cloudrun    			- Build cloud run service"
+	@echo "  make deploy-functions  			- Deploy all cloud functions"
+	@echo "  make deploy-ts-functions  			- Deploy TypeScript cloud functions"
+	@echo "  make deploy-py-functions  			- Deploy Python cloud functions"
+	@echo "  make deploy-rules	    			- Deploy firestore rules"
+	@echo "  make deploy-cloudrun ENV=dev  		- Deploy cloud run service to dev"
+	@echo "  make deploy-cloudrun ENV=prod  	- Deploy cloud run service to prod"
+	@echo "  make serve             			- Start local dev server"
+	@echo "  make clean             			- Remove build artifacts"
+	@echo "  make use-prod          			- Switch to production Firebase project"
+	@echo "  make use-dev           			- Switch to dev Firebase project"
+	@echo "  make use-env           			- Switch to given Firebase and GCloud project"
+	@echo "  make run-emulators     			- Run emulators for dev"
+	@echo "  make export-data       			- Export data from emulators"
