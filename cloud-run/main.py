@@ -36,10 +36,23 @@ def handle_firestore_event():
 
         form_data = firestore_utils.fetch_form_data(form_id)
         template_path = firestore_utils.download_template(form_data)
-        output_pdf = libreoffice_utils.convert_to_pdf(template_path)
-        final_url = firestore_utils.upload_result(form_id, output_pdf)
 
-        response = jsonify({"status": "success", "url": final_url})
+        form_parameters = form_data.get("formData", {})
+        filled_docx_path, output_pdf = libreoffice_utils.fill_template_and_convert(
+            template_path,
+            form_parameters
+        )
+
+        pdf_url = firestore_utils.upload_result(form_id, output_pdf, file_type="pdf")
+        docx_url = firestore_utils.upload_result(form_id, filled_docx_path, file_type="docx")
+
+        firestore_utils.update_document_urls(form_id, pdf_url, docx_url)
+
+        response = jsonify({
+            "status": "success",
+            "pdf_url": pdf_url,
+            "docx_url": docx_url
+        })
         response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
         return response
 

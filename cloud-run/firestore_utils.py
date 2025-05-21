@@ -1,9 +1,12 @@
 import os
+import json
 from google.cloud import firestore, storage
 from google.auth import default
+from google.oauth2 import service_account
 from tempfile import NamedTemporaryFile
 import logging
 from datetime import timedelta
+from pathlib import Path
 
 # Initialize Firebase clients
 credentials, project_id = default()
@@ -21,7 +24,7 @@ def fetch_form_data(form_id: str) -> dict:
             return None
         return doc.to_dict()
     except Exception as e:
-        print(f"Error fetching form data: {str(e)}", exc_info=True)
+        print(f"Error fetching form data: {str(e)}")
         raise
 
 def download_template(form_data: dict) -> str:
@@ -47,7 +50,7 @@ def download_template(form_data: dict) -> str:
             
             with NamedTemporaryFile(suffix=".docx", delete=False) as temp_file:
                 blob.download_to_filename(temp_file.name)
-                logger.info(f"Downloaded template to {temp_file.name}")
+                print(f"Downloaded template to {temp_file.name}")
                 return temp_file.name
             
         except Exception as storage_error:
@@ -58,9 +61,9 @@ def download_template(form_data: dict) -> str:
         print(f"Error downloading template: {str(e)}")
         raise
 
-def upload_result(form_id: str, output_pdf_path: str) -> str:
+def upload_result(form_id: str, file_path: str, file_type: str) -> str:
     try:
-        print("Uploading PDF...")
+        print(f"Uploading {file_type.upper()} file...")
 
         bucket_name = os.getenv("OUTPUT_BUCKET", "")
         if not bucket_name:
@@ -69,46 +72,107 @@ def upload_result(form_id: str, output_pdf_path: str) -> str:
         bucket = storage_client.bucket(bucket_name)
         
         # Generate a unique filename
-        blob_name = f"generated_documents/{form_id}/{os.path.basename(output_pdf_path)}"
+        file_name = Path(file_path).name
+        blob_name = f"generated_documents/{form_id}/{file_name}"
         blob = bucket.blob(blob_name)
 
-        # Ensure content type is set
+        # Set content type based on file type
+        content_type = {
+            "pdf": "application/pdf",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        }.get(file_type.lower(), "application/octet-stream")
+
+        # Upload file with appropriate metadata
         blob.upload_from_filename(
-            output_pdf_path,
-            content_type="application/pdf"
+            file_path,
+            content_type=content_type
         )
 
         # Set download-friendly headers
-        blob.content_disposition = f'attachment; filename="{os.path.basename(output_pdf_path)}"'
+        blob.content_disposition = f'attachment; filename="{file_name}"'
         blob.cache_control = "public, max-age=3600"
         blob.patch()
 
-        blob.upload_from_filename(output_pdf_path)
-        
-        # Make the file publicly accessible (optional)
+        print(f"Successfully uploaded {file_type.upper()} file: {blob_name}")
         return blob_name
     except Exception as e:
         print(f"Error uploading result: {str(e)}")
         raise
 
-def generate_signed_url(blob_path: str, expiration_hours: int = 1) -> str:
-    """Generate a temporary access URL"""
+def get_signing_credentials():
+    """Get credentials with private key for signing URLs"""
+    try:
+        # Try to load from explicit JSON content
+        key_json = os.getenv('URL_SIGNER_SA_KEY')
+        if key_json:
+            return service_account.Credentials.from_service_account_info(json.loads(key_json))
+        
+        print("No private key available for signing URLs")
+        return None
+        
+    except Exception as e:
+        print(f"Error loading signing credentials: {str(e)}")
+        return None
 
-    bucket_name = os.getenv("OUTPUT_BUCKET", "")
-    if not bucket_name:
-        raise ValueError("OUTPUT_BUCKET environment variable not set")
-    
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(blob_path)
-    
-    url = blob.generate_signed_url(
-        version="v4",
-        expiration=timedelta(hours=expiration_hours),
-        method="GET",
-        allowed_origins=[
-            "http://localhost:5173",
-            "https://doc-template-front-dev.web.app"
-            "https://doc-template-front.web.app"
-        ]
-    )
-    return url
+def generate_signed_url(blob_path: str, expiration_hours: int = 1) -> str:
+    """Generate a temporary access URL or public URL if signing not available"""
+    try:
+        bucket_name = os.getenv("OUTPUT_BUCKET", "")
+        if not bucket_name:
+            raise ValueError("OUTPUT_BUCKET environment variable not set")
+        
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(blob_path)
+        
+        # Check if blob exists and is public
+        if not blob.exists():
+            raise ValueError(f"Blob {blob_path} does not exist")
+            
+        if blob.public_url:
+            print(f"Using public URL for {blob_path}")
+            return blob.public_url
+            
+        # Try to generate signed URL if we have credentials
+        signing_credentials = get_signing_credentials()
+        if signing_credentials:
+            print('There are credentials. Generating signed URL')
+            return blob.generate_signed_url(
+                version="v4",
+                expiration=timedelta(hours=expiration_hours),
+                method="GET",
+                credentials=signing_credentials
+            )
+        
+        print('There are no credentials. Generating public URL')
+        
+        # Fallback to public URL if bucket is public
+        if bucket.iam_configuration.uniform_bucket_level_access_enabled:
+            raise RuntimeError("Bucket has uniform access enabled, cannot generate public URL")
+            
+        # Make the blob public temporarily
+        blob.make_public()
+        print(f"Using public URL as fallback for {blob_path}")
+        return blob.public_url
+        
+    except Exception as e:
+        print(f"Error generating URL: {str(e)}", exc_info=True)
+        raise
+
+def update_document_urls(form_id: str, pdf_url: str, docx_url: str) -> None:
+    try:
+        doc_ref = db.collection("forms").document(form_id)
+        
+        pdf_url = generate_signed_url(pdf_url)
+        docx_url = generate_signed_url(docx_url)
+        
+        doc_ref.update({
+            "generatedPdfUrl": pdf_url,
+            "generatedDocxUrl": docx_url,
+            "status": "completed",
+            "updatedAt": firestore.SERVER_TIMESTAMP
+        })
+        
+        logger.info(f"Updated document {form_id} with generated file URLs")
+    except Exception as e:
+        logger.error(f"Error updating document URLs: {str(e)}", exc_info=True)
+        raise
