@@ -32,7 +32,7 @@ def handle_firestore_event():
             response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
             return response, 400
         
-        logger.info(f"Processing new document job for form: {form_id}")
+        print(f"Processing new document job for form: {form_id}")
 
         form_data = firestore_utils.fetch_form_data(form_id)
         template_path = firestore_utils.download_template(form_data)

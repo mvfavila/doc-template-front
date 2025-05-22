@@ -38,7 +38,7 @@ def fill_template_and_convert(template_path: str, form_data: dict) -> tuple[str,
         return filled_docx_path, pdf_path
         
     except Exception as e:
-        logger.error(f"Template processing failed: {str(e)}", exc_info=True)
+        print(f"Template processing failed: {str(e)}")
         raise
 
 def fill_word_template(template_path: str, output_path: str, form_data: dict):
@@ -55,28 +55,30 @@ def fill_word_template(template_path: str, output_path: str, form_data: dict):
         
         # Replace parameters in paragraphs
         for paragraph in doc.paragraphs:
-            for key, value in form_data.items():
-                if isinstance(value, str):  # Only process string values
-                    placeholder = f"[{key}]"
-                    if placeholder in paragraph.text:
-                        paragraph.text = paragraph.text.replace(placeholder, value)
+            for key, field_data in form_data.items():
+                # Extract the actual value from the field data object
+                value = str(field_data.get('value', '')) if isinstance(field_data, dict) else str(field_data)
+                placeholder = f"{{{{{key}}}}}"
+                if placeholder in paragraph.text:
+                    paragraph.text = paragraph.text.replace(placeholder, value)
         
         # Replace parameters in tables
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
                     for paragraph in cell.paragraphs:
-                        for key, value in form_data.items():
-                            if isinstance(value, str):  # Only process string values
-                                placeholder = f"[{key}]"
-                                if placeholder in paragraph.text:
-                                    paragraph.text = paragraph.text.replace(placeholder, value)
-        
+                        for key, field_data in form_data.items():
+                            # Extract the actual value from the field data object
+                            value = str(field_data.get('value', '')) if isinstance(field_data, dict) else str(field_data)
+                            placeholder = f"{{{{{key}}}}}"
+                            if placeholder in paragraph.text:
+                                paragraph.text = paragraph.text.replace(placeholder, value)
+
         doc.save(output_path)
-        logger.info(f"Successfully filled template: {output_path}")
+        print(f"Successfully filled template: {output_path}")
         
     except Exception as e:
-        logger.error(f"Failed to fill Word template: {str(e)}", exc_info=True)
+        print(f"Failed to fill Word template: {str(e)}")
         raise
 
 def convert_to_pdf(docx_path: str) -> str:
@@ -103,7 +105,7 @@ def convert_to_pdf(docx_path: str) -> str:
             docx_path
         ]
         
-        logger.info(f"Running command: {' '.join(cmd)}")
+        print(f"Running command: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
             stdout=subprocess.PIPE,
@@ -114,22 +116,19 @@ def convert_to_pdf(docx_path: str) -> str:
         
         # Log LibreOffice output
         if result.stdout:
-            logger.debug(f"LibreOffice stdout: {result.stdout}")
+            print(f"LibreOffice stdout: {result.stdout}")
         if result.stderr:
-            logger.warning(f"LibreOffice stderr: {result.stderr}")
+            print(f"LibreOffice stderr: {result.stderr}")
 
         if not os.path.exists(output_pdf):
             raise RuntimeError(f"PDF not generated at {output_pdf}")
 
-        logger.info(f"Successfully converted to PDF: {output_pdf}")
+        print(f"Successfully converted to PDF: {output_pdf}")
         return output_pdf
 
     except subprocess.CalledProcessError as e:
-        logger.error(
-            f"LibreOffice failed with code {e.returncode}: {e.stderr}",
-            exc_info=True
-        )
+        print(f"LibreOffice failed with code {e.returncode}: {e.stderr}")
         raise
     except Exception as e:
-        logger.error(f"PDF conversion failed: {str(e)}", exc_info=True)
+        print(f"PDF conversion failed: {str(e)}")
         raise

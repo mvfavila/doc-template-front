@@ -32,15 +32,17 @@ Creates .pdf and .docx files based on the form and the template and stores it in
     ```
     DOC_TEMPLATE_FIREBASE_BUCKET_DEV
     SA_DOC_GENERATOR_DEV
+    URL_SIGNER_DEV_SA_KEY
     ```
 
     Format:
     ```
     DOC_TEMPLATE_FIREBASE_BUCKET_DEV=doc-template-front-dev.firebasestorage.app
     SA_DOC_GENERATOR_DEV=doc-generator-sa@doc-template-front-dev.iam.gserviceaccount.com
+    URL_SIGNER_DEV_SA_KEY='{"type":"service_account","project_id"...
     ```
 
-2. The cloud run service requires a Service Account with the following roles:
+2. The cloud run service requires a `SA_DOC_GENERATOR_DEV` Service Account with the following roles:
     ```
     roles/datastore.user
     roles/storage.objectAdmin
@@ -64,3 +66,24 @@ Creates .pdf and .docx files based on the form and the template and stores it in
     serviceAccount:[SERVICE_ACCOUNT]@[PROJECT_ID].iam.gserviceaccount.com:objectAdmin \
     gs://[BUCKET]
     ```
+
+3. To set the `URL_SIGNER_DEV_SA_KEY` value:
+    Go to [Google Cloud Console → IAM & Admin → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
+
+    Click "Create Service Account"
+
+    Name: storage-signer (or similar)
+
+    Description: "Generates signed URLs for Cloud Storage"
+
+    Assign these roles:
+
+    Storage Object Admin (roles/storage.objectAdmin)
+    (Allows signing URLs + managing objects)
+
+    Service Account Token Creator (roles/iam.serviceAccountTokenCreator)
+    (Required for signing URLs)
+
+    Click "Create Key" → Choose JSON → Download the key file.
+
+    Create a `URL_SIGNER_DEV_SA_KEY` environment variable and set its value with the JSON key value.
