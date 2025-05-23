@@ -236,6 +236,98 @@
           @submit="handleAdminFormSubmit"
         />
       </div>
+
+      <!-- Document Management -->
+      <div class="card">
+        <h2>Documentos</h2>
+        
+        <!-- Search and Filter Controls -->
+        <div class="document-controls">
+          <div class="search-box">
+            <input 
+              v-model="documentSearch" 
+              placeholder="Buscar por cliente ou modelo..."
+              @keyup.enter="fetchDocuments"
+            />
+            <button @click="fetchDocuments">Buscar</button>
+          </div>
+          
+          <div class="filter-controls">
+            <select v-model="documentFilter.customerId">
+              <option value="">Todos os clientes</option>
+              <option 
+                v-for="customer in customers" 
+                :key="customer.id" 
+                :value="customer.id"
+              >
+                {{ customer.name }}
+              </option>
+            </select>
+            
+            <select v-model="documentFilter.templateId">
+              <option value="">Todos os modelos</option>
+              <option 
+                v-for="template in templates" 
+                :key="template.id" 
+                :value="template.id"
+              >
+                {{ template.name }}
+              </option>
+            </select>
+            
+            <button @click="resetFilters">Limpar filtros</button>
+          </div>
+        </div>
+        
+        <!-- Documents Table -->
+        <div class="documents-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Modelo</th>
+                <th>Criado em</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="doc in filteredDocuments" :key="doc.id">
+                <td>{{ getCustomerName(doc.customerId) }}</td>
+                <td>{{ getTemplateName(doc.templateId) }}</td>
+                <td>{{ formatDate(doc.updatedAt) }}</td>
+                <td class="actions">
+                  <button 
+                    @click="downloadFile(doc.generatedPdfUrl, `${getCustomerName(doc.customerId)}_${getTemplateName(doc.templateId)}.pdf`)"
+                    :disabled="!doc.generatedPdfUrl"
+                    class="action-button"
+                  >
+                    PDF
+                  </button>
+                  <button 
+                    @click="downloadFile(doc.generatedDocxUrl, `${getCustomerName(doc.customerId)}_${getTemplateName(doc.templateId)}.docx`)"
+                    :disabled="!doc.generatedDocxUrl"
+                    class="action-button"
+                  >
+                    DOCX
+                  </button>
+                  <span v-if="!doc.generatedPdfUrl || !doc.generatedDocxUrl" class="error-badge">
+                    !
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <div v-if="isLoadingDocuments" class="loading-state">
+            Loading documents...
+          </div>
+          
+          <div v-if="!isLoadingDocuments && !filteredDocuments.length" class="empty-state">
+            No documents found matching your criteria
+          </div>
+        </div>
+      </div>
+      
     </section>
 
     <!-- Modals -->
@@ -306,6 +398,15 @@ const showCustomerModal = ref(false);
 const selectedTemplate = ref(null);
 const selectedForm = ref(null);
 
+// Document Data
+const documents = ref([]);
+const documentSearch = ref("");
+const isLoadingDocuments = ref(false);
+const documentFilter = ref({
+  customerId: "",
+  templateId: ""
+});
+
 // Template Upload Data
 const fileInput = ref(null);
 const selectedFile = ref(null);
@@ -338,6 +439,38 @@ const filteredCustomers = computed(() => {
 const filteredForms = computed(() => {
   if (formFilter.value === "all") return forms.value;
   return forms.value.filter((form) => form.status === formFilter.value);
+});
+
+const filteredDocuments = computed(() => {
+  let filtered = documents.value;
+  
+  // Apply customer filter
+  if (documentFilter.value.customerId) {
+    filtered = filtered.filter(doc => 
+      doc.customerId === documentFilter.value.customerId
+    );
+  }
+  
+  // Apply template filter
+  if (documentFilter.value.templateId) {
+    filtered = filtered.filter(doc => 
+      doc.templateId === documentFilter.value.templateId
+    );
+  }
+  
+  // Apply search
+  if (documentSearch.value) {
+    const searchTerm = documentSearch.value.toLowerCase();
+    filtered = filtered.filter(doc => {
+      const customerName = getCustomerName(doc.customerId).toLowerCase();
+      const templateName = getTemplateName(doc.templateId).toLowerCase();
+      return (
+        customerName.includes(searchTerm) || 
+        templateName.includes(searchTerm));
+    });
+  }
+  
+  return filtered;
 });
 
 // Methods
@@ -415,7 +548,6 @@ const initiatePasswordReset = async (customerId) => {
   }
 };
 
-// Template Upload Methods
 const triggerFileInput = () => {
   fileInput.value.click();
 };
@@ -569,11 +701,102 @@ const refreshForms = async () => {
   await fetchForms();
 };
 
+const fetchDocuments = async () => {
+  try {
+    isLoadingDocuments.value = true;
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    if (!userDoc.exists()) return;
+    
+    const q = query(
+      collection(db, "forms"),
+      where("officeId", "==", userDoc.data().officeId),
+      where("status", "==", "completed")
+    );
+    
+    const snapshot = await getDocs(q);
+    documents.value = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
+      const docData = docSnapshot.data();
+      
+      // Generate fresh download URLs
+      const [pdfUrl, docxUrl] = await Promise.all([
+        generateFreshUrl(docData.generatedPdfPath),
+        generateFreshUrl(docData.generatedDocxPath)
+      ]);
+      
+      return {
+        id: docSnapshot.id,
+        ...docData,
+        generatedPdfUrl: pdfUrl,
+        generatedDocxUrl: docxUrl
+      };
+    }));
+    
+  } catch (error) {
+    console.error("Error fetching documents:", error);
+  } finally {
+    isLoadingDocuments.value = false;
+  }
+};
+
+const generateFreshUrl = async (storagePath) => {
+  if (!storagePath) return null;
+  
+  try {
+    // Try to generate a fresh download URL
+    const fileRef = storageRef(storage, storagePath);
+    return await getDownloadURL(fileRef);
+  } catch (error) {
+    console.error("Error generating download URL:", error);
+    return null;
+  }
+};
+
+const resetFilters = () => {
+  documentSearch.value = "";
+  documentFilter.value = {
+    customerId: "",
+    templateId: ""
+  };
+};
+
+const formatDate = (timestamp) => {
+  if (!timestamp) return 'N/A';
+  const date = timestamp.toDate();
+  return date.toLocaleString();
+};
+
+const downloadFile = (url, filename) => {
+  if (!url) {
+    alert("Download link is not available. Please try again later.");
+    return;
+  }
+  
+  // Create a temporary anchor element
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  
+  // Fallback if the direct download doesn't work
+  setTimeout(() => {
+    if (!document.body.querySelector(`iframe[src="${url}"]`)) {
+      window.open(url, '_blank');
+    }
+  }, 1000);
+};
+
 // Lifecycle
 onMounted(async () => {
   await fetchCustomers();
   await setupTemplateListener();
   await fetchForms();
+  fetchDocuments();
 });
 
 // Add these new data properties
@@ -712,13 +935,17 @@ h1 {
 }
 
 .action-button {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
   background-color: #42b983;
   color: white;
-  border: none;
-  padding: 0.5rem 1rem;
+  text-decoration: none;
   border-radius: 4px;
-  cursor: pointer;
-  margin-bottom: 1rem;
+  transition: background-color 0.2s;
+}
+
+.action-button:hover {
+  background-color: #3aa876;
 }
 
 .search-box {
@@ -834,6 +1061,11 @@ button.reset-button {
   color: white;
 }
 
+.status-badge.completed {
+  background-color: #2ecc71;
+  color: white;
+}
+
 @media (max-width: 768px) {
   .admin-sections {
     grid-template-columns: 1fr;
@@ -850,6 +1082,15 @@ button.reset-button {
   
   .placeholder-item {
     padding: 1rem;
+  }
+
+  .filter-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .filter-controls select {
+    width: 100%;
   }
 }
 
@@ -1144,5 +1385,104 @@ button.reset-button {
 
 .client-item:last-child {
   border-bottom: none;
+}
+
+.document-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.filter-controls select {
+  padding: 0.5rem;
+  min-width: 200px;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.documents-table {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.documents-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.documents-table th,
+.documents-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.documents-table th {
+  background-color: #f5f5f5;
+  position: sticky;
+  top: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.loading-state {
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+}
+
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}
+
+.error-badge {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background-color: #e74c3c;
+  color: white;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 18px;
+  font-size: 12px;
+  margin-left: 5px;
+  cursor: help;
+  position: relative;
+}
+
+.error-badge:hover::after {
+  content: "File unavailable";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 100;
+}
+
+.action-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 }
 </style>

@@ -79,7 +79,7 @@ build-cloudrun: use-env
 	gcloud builds submit --tag us-central1-docker.pkg.dev/${PROJECT}/cloud-run-repo/doc-generator cloud-run/.
 
 # Deployment commands
-.PHONY: deploy-functions deploy-rules deploy-cloudrun deploy-frontend
+.PHONY: deploy-functions deploy-rules-firestore deploy-rules-storage deploy-cloudrun deploy-frontend
 deploy-frontend: build-frontend
 	@echo " Deploying to ${DEPLOY_TARGET} (${PROJECT})..."
 	${FIREBASE} deploy --only hosting:${DEPLOY_TARGET}
@@ -109,9 +109,13 @@ deploy-py-functions:
 		firebase deploy --only functions:python --debug && \
 		echo "=== Deployment Complete ==="
 
-deploy-rules: use-env
+deploy-rules-firestore: use-env
 	@echo " Deploying firestore rules..."
 	${FIREBASE} deploy --only firestore:rules
+
+deploy-rules-storage: use-env
+	@echo " Deploying storage rules..."
+	${FIREBASE} deploy --only storage:rules
 
 deploy-cloudrun: build-cloudrun
 	@echo " Deploying cloud run service..."
@@ -181,7 +185,8 @@ help:
 	@echo "  make deploy-functions  			- Deploy all cloud functions"
 	@echo "  make deploy-ts-functions  			- Deploy TypeScript cloud functions"
 	@echo "  make deploy-py-functions  			- Deploy Python cloud functions"
-	@echo "  make deploy-rules	    			- Deploy firestore rules"
+	@echo "  make deploy-rules-firestore	    - Deploy firestore rules"
+	@echo "  make deploy-rules-storage		    - Deploy storage rules"
 	@echo "  make deploy-cloudrun ENV=dev  		- Deploy cloud run service to dev"
 	@echo "  make deploy-cloudrun ENV=prod  	- Deploy cloud run service to prod"
 	@echo "  make serve             			- Start local dev server"
