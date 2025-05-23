@@ -287,7 +287,6 @@
                 <th>Cliente</th>
                 <th>Modelo</th>
                 <th>Criado em</th>
-                <th>Status</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -296,11 +295,6 @@
                 <td>{{ getCustomerName(doc.customerId) }}</td>
                 <td>{{ getTemplateName(doc.templateId) }}</td>
                 <td>{{ formatDate(doc.updatedAt) }}</td>
-                <td>
-                  <span class="status-badge" :class="doc.status">
-                    {{ doc.status }}
-                  </span>
-                </td>
                 <td class="actions">
                   <button 
                     @click="downloadFile(doc.generatedPdfUrl, `${getCustomerName(doc.customerId)}_${getTemplateName(doc.templateId)}.pdf`)"
