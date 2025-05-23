@@ -277,15 +277,6 @@
             
             <button @click="resetFilters">Limpar filtros</button>
           </div>
-          
-          <div class="bulk-actions">
-            <button @click="downloadAll('pdf')" :disabled="!filteredDocuments.length">
-              Download All PDFs
-            </button>
-            <button @click="downloadAll('docx')" :disabled="!filteredDocuments.length">
-              Download All DOCX
-            </button>
-          </div>
         </div>
         
         <!-- Documents Table -->
@@ -775,18 +766,6 @@ const resetFilters = () => {
     customerId: "",
     templateId: ""
   };
-};
-
-const downloadAll = async (type) => {
-  const urls = filteredDocuments.value.map(doc => 
-    type === 'pdf' ? doc.generatedPdfUrl : doc.generatedDocxUrl
-  );
-  
-  // This would need a server-side endpoint to zip files
-  // Currently it's a basic implementation that downloads files one by one
-  for (const url of urls) {
-    window.open(url, '_blank');
-  }
 };
 
 const formatDate = (timestamp) => {
