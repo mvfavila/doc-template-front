@@ -166,7 +166,7 @@
             <option value="all">Todos</option>
             <option value="pending">Pendentes</option>
             <option value="approved">Aprovados</option>
-            <option value="rejected">Rejeitados</option>
+            <option value="completed">Concluído</option>
           </select>
         </div>
 
@@ -1053,11 +1053,6 @@ button.reset-button {
 
 .status-badge.approved {
   background-color: #2ecc71;
-  color: white;
-}
-
-.status-badge.rejected {
-  background-color: #e74c3c;
   color: white;
 }
 
