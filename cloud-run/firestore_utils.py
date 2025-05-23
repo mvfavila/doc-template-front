@@ -61,7 +61,7 @@ def download_template(form_data: dict) -> str:
         print(f"Error downloading template: {str(e)}")
         raise
 
-def upload_result(form_id: str, file_path: str, file_type: str) -> str:
+def upload_result(form_id: str, file_path: str, file_type: str) -> tuple[str, str]:
     try:
         print(f"Uploading {file_type.upper()} file...")
 
@@ -94,7 +94,8 @@ def upload_result(form_id: str, file_path: str, file_type: str) -> str:
         blob.patch()
 
         print(f"Successfully uploaded {file_type.upper()} file: {blob_name}")
-        return blob_name
+        return blob_name, generate_signed_url(blob_name)
+        
     except Exception as e:
         print(f"Error uploading result: {str(e)}")
         raise
@@ -158,21 +159,23 @@ def generate_signed_url(blob_path: str, expiration_hours: int = 1) -> str:
         print(f"Error generating URL: {str(e)}", exc_info=True)
         raise
 
-def update_document_urls(form_id: str, pdf_url: str, docx_url: str) -> None:
+def update_document_urls(form_id: str, pdf_path: str, docx_path: str) -> None:
     try:
         doc_ref = db.collection("forms").document(form_id)
         
-        pdf_url = generate_signed_url(pdf_url)
-        docx_url = generate_signed_url(docx_url)
+        pdf_url = generate_signed_url(pdf_path)
+        docx_url = generate_signed_url(docx_path)
         
         doc_ref.update({
             "generatedPdfUrl": pdf_url,
+            "generatedPdfPath": pdf_path,
             "generatedDocxUrl": docx_url,
+            "generatedDocxPath": docx_path,
             "status": "completed",
             "updatedAt": firestore.SERVER_TIMESTAMP
         })
         
-        logger.info(f"Updated document {form_id} with generated file URLs")
+        logger.info(f"Updated document {form_id} with generated file URLs and paths")
     except Exception as e:
         logger.error(f"Error updating document URLs: {str(e)}", exc_info=True)
         raise

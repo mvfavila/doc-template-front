@@ -311,22 +311,23 @@
                   </span>
                 </td>
                 <td class="actions">
-                  <a 
-                    :href="doc.generatedPdfUrl" 
-                    target="_blank" 
-                    download
+                  <button 
+                    @click="downloadFile(doc.generatedPdfUrl, `${getCustomerName(doc.customerId)}_${getTemplateName(doc.templateId)}.pdf`)"
+                    :disabled="!doc.generatedPdfUrl"
                     class="action-button"
                   >
                     PDF
-                  </a>
-                  <a 
-                    :href="doc.generatedDocxUrl" 
-                    target="_blank" 
-                    download
+                  </button>
+                  <button 
+                    @click="downloadFile(doc.generatedDocxUrl, `${getCustomerName(doc.customerId)}_${getTemplateName(doc.templateId)}.docx`)"
+                    :disabled="!doc.generatedDocxUrl"
                     class="action-button"
                   >
                     DOCX
-                  </a>
+                  </button>
+                  <span v-if="!doc.generatedPdfUrl || !doc.generatedDocxUrl" class="error-badge">
+                    !
+                  </span>
                 </td>
               </tr>
             </tbody>
@@ -731,15 +732,40 @@ const fetchDocuments = async () => {
     );
     
     const snapshot = await getDocs(q);
-    documents.value = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
+    documents.value = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
+      const docData = docSnapshot.data();
+      
+      // Generate fresh download URLs
+      const [pdfUrl, docxUrl] = await Promise.all([
+        generateFreshUrl(docData.generatedPdfPath),
+        generateFreshUrl(docData.generatedDocxPath)
+      ]);
+      
+      return {
+        id: docSnapshot.id,
+        ...docData,
+        generatedPdfUrl: pdfUrl,
+        generatedDocxUrl: docxUrl
+      };
     }));
     
   } catch (error) {
     console.error("Error fetching documents:", error);
   } finally {
     isLoadingDocuments.value = false;
+  }
+};
+
+const generateFreshUrl = async (storagePath) => {
+  if (!storagePath) return null;
+  
+  try {
+    // Try to generate a fresh download URL
+    const fileRef = storageRef(storage, storagePath);
+    return await getDownloadURL(fileRef);
+  } catch (error) {
+    console.error("Error generating download URL:", error);
+    return null;
   }
 };
 
@@ -767,6 +793,29 @@ const formatDate = (timestamp) => {
   if (!timestamp) return 'N/A';
   const date = timestamp.toDate();
   return date.toLocaleString();
+};
+
+const downloadFile = (url, filename) => {
+  if (!url) {
+    alert("Download link is not available. Please try again later.");
+    return;
+  }
+  
+  // Create a temporary anchor element
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  
+  // Fallback if the direct download doesn't work
+  setTimeout(() => {
+    if (!document.body.querySelector(`iframe[src="${url}"]`)) {
+      window.open(url, '_blank');
+    }
+  }, 1000);
 };
 
 // Lifecycle
@@ -1428,5 +1477,39 @@ button.reset-button {
   text-align: center;
   color: #666;
   font-style: italic;
+}
+
+.error-badge {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background-color: #e74c3c;
+  color: white;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 18px;
+  font-size: 12px;
+  margin-left: 5px;
+  cursor: help;
+  position: relative;
+}
+
+.error-badge:hover::after {
+  content: "File unavailable";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 100;
+}
+
+.action-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 }
 </style>

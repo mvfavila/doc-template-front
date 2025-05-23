@@ -43,10 +43,10 @@ def handle_firestore_event():
             form_parameters
         )
 
-        pdf_url = firestore_utils.upload_result(form_id, output_pdf, file_type="pdf")
-        docx_url = firestore_utils.upload_result(form_id, filled_docx_path, file_type="docx")
+        pdf_path, pdf_url = firestore_utils.upload_result(form_id, output_pdf, file_type="pdf")
+        docx_path, docx_url = firestore_utils.upload_result(form_id, filled_docx_path, file_type="docx")
 
-        firestore_utils.update_document_urls(form_id, pdf_url, docx_url)
+        firestore_utils.update_document_urls(form_id, pdf_path, docx_path)
 
         response = jsonify({
             "status": "success",
