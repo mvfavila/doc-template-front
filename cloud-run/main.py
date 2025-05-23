@@ -43,8 +43,14 @@ def handle_firestore_event():
             form_parameters
         )
 
-        pdf_path, pdf_url = firestore_utils.upload_result(form_id, output_pdf, file_type="pdf")
-        docx_path, docx_url = firestore_utils.upload_result(form_id, filled_docx_path, file_type="docx")
+        office_id = form_data.get("officeId")
+        if not office_id:
+            response = jsonify({"error": "officeId is required in form data"})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 400
+
+        pdf_path, pdf_url = firestore_utils.upload_result(form_id, output_pdf, file_type="pdf", office_id=office_id)
+        docx_path, docx_url = firestore_utils.upload_result(form_id, filled_docx_path, file_type="docx", office_id=office_id)
 
         firestore_utils.update_document_urls(form_id, pdf_path, docx_path)
 

@@ -10,8 +10,9 @@ service firebase.storage {
       allow read, delete: if isSpecificOfficeAdmin(officeId);
     }
 
-    match /generated_documents/{officeId}/{documentId}/{fileName} {
-      allow read: if request.auth != null;
+    match /generated_documents/{officeId}/{formId}/{fileName} {
+      allow read: if request.auth != null && 
+                   isSpecificOfficeAdmin(officeId);
     }
 
     // Block all public access by default

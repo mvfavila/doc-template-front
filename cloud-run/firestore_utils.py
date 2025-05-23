@@ -61,7 +61,7 @@ def download_template(form_data: dict) -> str:
         print(f"Error downloading template: {str(e)}")
         raise
 
-def upload_result(form_id: str, file_path: str, file_type: str) -> tuple[str, str]:
+def upload_result(form_id: str, file_path: str, file_type: str, office_id: str) -> tuple[str, str]:
     try:
         print(f"Uploading {file_type.upper()} file...")
 
@@ -71,9 +71,9 @@ def upload_result(form_id: str, file_path: str, file_type: str) -> tuple[str, st
 
         bucket = storage_client.bucket(bucket_name)
         
-        # Generate a unique filename
+        # Generate a unique filename with officeId in path
         file_name = Path(file_path).name
-        blob_name = f"generated_documents/{form_id}/{file_name}"
+        blob_name = f"generated_documents/{office_id}/{form_id}/{file_name}"
         blob = bucket.blob(blob_name)
 
         # Set content type based on file type
