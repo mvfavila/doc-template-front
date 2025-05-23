@@ -71,7 +71,7 @@
       pending: "Pendente",
       submitted: "Enviado",
       approved: "Aprovado",
-      rejected: "Rejeitado",
+      completed: "Concluído",
     };
     return statusMap[status] || status;
   };

@@ -13,7 +13,6 @@
           :documents="pendingDocuments"
           @submit="handleDocumentSubmit"
           @edit="handleDocumentEdit"
-          @continue="handleDocumentContinue"
         />
       </div>
 
@@ -21,8 +20,9 @@
         <h2>Documentos Enviados</h2>
         <client-document-list
           :documents="completedDocuments"
-          :show-status="true"
           :readonly="true"
+          :show-status="true"
+          :status-mapper="statusMapper"
         />
       </div>
     </div>
@@ -72,8 +72,19 @@ const pendingDocuments = computed(() =>
 );
 
 const completedDocuments = computed(() =>
-  forms.value.filter(form => form.status === 'submitted' || form.status === 'approved')
+  forms.value.filter(form => 
+    form.status === 'submitted' || 
+    form.status === 'approved' || 
+    form.status === 'completed'
+  )
 );
+
+// Status mapper for completed documents
+const statusMapper = (status) => {
+  if (status === 'submitted') return 'Em revisão';
+  if (status === 'approved' || status === 'completed') return 'Aprovado';
+  return status;
+};
 
 // Methods
 const fetchForms = async () => {
@@ -117,14 +128,6 @@ const handleDocumentSubmit = async (formId) => {
 };
 
 const handleDocumentEdit = async (formId) => {
-  const form = forms.value.find(f => f.id === formId);
-  if (form) {
-    selectedForm.value = form;
-    isReadonly.value = false;
-  }
-};
-
-const handleDocumentContinue = async (formId) => {
   const form = forms.value.find(f => f.id === formId);
   if (form) {
     selectedForm.value = form;
