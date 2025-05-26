@@ -109,7 +109,7 @@
                 @click="editPlaceholderMasks(template)"
                 class="edit-button"
               >
-                Configurar Placeholders
+                Configurar Modelo
               </button>
             </div>
           </div>
