@@ -84,6 +84,13 @@
       @close="activeDocument = null"
       @submit="handleDocumentSubmit"
     />
+
+    <form-review-modal
+      v-if="activeDocument"
+      :form="activeDocument"
+      @close="activeDocument = null"
+      @saved="handleFormSaved"
+    />
   </div>
 </template>
 
@@ -102,6 +109,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore'
 import DocumentList from '@/components/admin/DocumentList.vue';
+import FormReviewModal from '@/components/admin/FormReviewModal.vue';
 
 const db = getFirestore()
 const auth = getAuth();
@@ -238,12 +246,26 @@ const getTemplateName = (templateId) => {
 }
 
 const handleEditDocument = (doc) => {
-  activeDocument.value = doc
-}
+  activeDocument.value = doc;
+};
 
 const handleReviewDocument = (doc) => {
-  activeDocument.value = doc
-}
+  activeDocument.value = doc;
+};
+
+const handleFormSaved = async (updatedForm) => {
+  try {
+    await updateDoc(doc(db, 'forms', updatedForm.id), {
+      formData: updatedForm.formData,
+      status: updatedForm.status,
+      updatedAt: serverTimestamp()
+    });
+    await fetchDocuments();
+    activeDocument.value = null;
+  } catch (error) {
+    console.error('Error saving form:', error);
+  }
+};
 
 const handleDocumentSubmit = async (formData) => {
   try {
