@@ -9,10 +9,13 @@ export const useAuth = () => {
   const router = useRouter();
 
   const user = ref(null);
+  const role = ref(null);
+  const officeId = ref(null);
   const isAuthenticated = ref(false);
   const isLoading = ref(true);
   const isSigningOut = ref(false);
   const authError = ref(null);
+  const isReady = ref(false);
 
   const fetchUserData = async (firebaseUser) => {
     try {
@@ -22,19 +25,24 @@ export const useAuth = () => {
         throw new Error("User document not found for UID: " + firebaseUser.uid);
       }
 
-      user.value = {
+      const userData = {
         ...firebaseUser,
         role: userDoc.data()?.role,
         officeId: userDoc.data()?.officeId,
         isActive: userDoc.data()?.isActive,
       };
+
+      user.value = userData;
+      role.value = userDoc.data()?.role; // Set role ref
+      officeId.value = userDoc.data()?.officeId; // Set officeId ref
       isAuthenticated.value = true;
     } catch (error) {
       console.error("Error fetching user data:", error);
       authError.value = error;
-      await handleSignOut(); // Force sign out if user data is invalid
+      await handleSignOut();
     } finally {
       isLoading.value = false;
+      isReady.value = true;
     }
   };
 
@@ -42,9 +50,13 @@ export const useAuth = () => {
     if (firebaseUser) {
       await fetchUserData(firebaseUser);
     } else {
+      // Reset all state
       user.value = null;
+      role.value = null;
+      officeId.value = null;
       isAuthenticated.value = false;
       isLoading.value = false;
+      isReady.value = true;
     }
   });
 
@@ -66,8 +78,11 @@ export const useAuth = () => {
   return {
     authError,
     user,
+    role,
+    officeId,
     isAuthenticated,
     isLoading,
+    isReady,
     handleSignOut,
     isSigningOut,
   };
