@@ -76,17 +76,19 @@
       </section>
     </div>
 
-    <!-- Document Modal -->
-    <document-modal
-      v-if="activeDocument"
-      :document="activeDocument"
-      :is-admin="true"
+    <form-modal
+      v-if="activeDocument && (activeDocument.status === 'pending')"
+      :key="activeDocument.id"
+      :form="activeDocument"
+      :template-id="activeDocument?.templateId"
+      :readonly="activeDocument.status === 'submitted'"
       @close="activeDocument = null"
       @submit="handleDocumentSubmit"
+      @save="handleFormSave"
     />
 
     <form-review-modal
-      v-if="activeDocument"
+      v-if="activeDocument && (activeDocument.status === 'submitted')"
       :form="activeDocument"
       @close="activeDocument = null"
       @saved="handleFormSaved"
@@ -109,6 +111,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore'
 import DocumentList from '@/components/admin/DocumentList.vue';
+import FormModal from '@/components/client/FormModal.vue';
 import FormReviewModal from '@/components/admin/FormReviewModal.vue';
 
 const db = getFirestore()
@@ -146,7 +149,6 @@ const completedDocuments = computed(() =>
 
 const filteredPendingDocuments = computed(() => 
   pendingDocuments.value.filter(doc => {
-    console.log("doc", doc)
     return pendingSearch.value === "" ||
     doc.templateName.toLowerCase().includes(pendingSearch.value.toLowerCase())
   })
@@ -180,7 +182,7 @@ const filteredCompletedDocuments = computed(() => {
 // Methods
 const fetchDocuments = async () => {
   try {
-    isLoading.value = true
+    isLoading.value = true;
     const user = auth.currentUser;
     const userDoc = await getDoc(doc(db, 'users', user.uid))
     if (!userDoc.exists()) return
@@ -203,10 +205,15 @@ const fetchDocuments = async () => {
       ))
     ])
     
-    documents.value = docsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }))
+    documents.value = docsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      const template = templates.value.find(t => t.id === data.templateId);
+      return {
+        id: doc.id,
+        templateName: template?.name || 'Documento',
+        ...data
+      }
+    });
     
     customers.value = custsSnapshot.docs.map(doc => ({
       id: doc.id,
@@ -235,22 +242,18 @@ const mapAdminStatus = (status) => {
   return statusMap[status] || status
 }
 
-const getCustomerName = (customerId) => {
-  const customer = customers.value.find(c => c.id === customerId)
-  return customer?.name || 'Cliente desconhecido'
-}
-
-const getTemplateName = (templateId) => {
-  const template = templates.value.find(t => t.id === templateId)
-  return template?.name || 'Modelo desconhecido'
-}
-
 const handleEditDocument = (doc) => {
-  activeDocument.value = doc;
+  activeDocument.value = {
+    ...doc,
+    name: doc.templateName || 'Documento'
+  };
 };
 
 const handleReviewDocument = (doc) => {
-  activeDocument.value = doc;
+  activeDocument.value = {
+    ...doc,
+    name: doc.templateName || 'Documento'
+  };
 };
 
 const handleFormSaved = async (updatedForm) => {
@@ -267,17 +270,32 @@ const handleFormSaved = async (updatedForm) => {
   }
 };
 
-const handleDocumentSubmit = async (formData) => {
+const handleFormSave = async (formData) => {
   try {
     await updateDoc(doc(db, 'forms', activeDocument.value.id), {
       formData,
-      status: formData.status || 'submitted',
+      status: 'pending',
       updatedAt: serverTimestamp()
-    })
-    await fetchDocuments()
-    activeDocument.value = null
+    });
+    await fetchDocuments();
+    activeDocument.value = null;
   } catch (error) {
-    console.error('Error submitting document:', error)
+    console.error('Error saving form:', error);
+  }
+};
+
+const handleDocumentSubmit = async (formData) => {
+  try {
+    const newStatus = activeDocument.value.status === 'pending' ? 'submitted' : activeDocument.value.status;
+    await updateDoc(doc(db, 'forms', activeDocument.value.id), {
+      formData,
+      status: newStatus,
+      updatedAt: serverTimestamp()
+    });
+    await fetchDocuments();
+    activeDocument.value = null;
+  } catch (error) {
+    console.error('Error submitting document:', error);
   }
 }
 

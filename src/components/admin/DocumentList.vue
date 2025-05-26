@@ -4,7 +4,7 @@
       Nenhum documento encontrado
     </div>
 
-    <div v-for="document in documents" :key="document.id" class="document-item">
+    <div v-for="document in documents" :key="document.id" class="document-item" @click="handleAction(document)">
       <div class="document-info">
         <h3>{{ document.templateName || 'Documento sem nome' }}</h3>
         <div class="document-meta">
