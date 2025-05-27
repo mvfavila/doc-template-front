@@ -1,7 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "@/views/Home.vue";
 import SignIn from "@/views/SignIn.vue";
-import { useAuth } from "@/composables/useAuth";
+import OfficeAdminLandingPage from "@/views/OfficeAdminLandingPage.vue";
+import Dashboard from "@/views/Dashboard.vue";
+import { getAuth } from "@firebase/auth";
+import { getDoc, doc } from "@firebase/firestore";
+import { db } from '@/firebase';
 
 const routes = [
   {
@@ -17,10 +21,14 @@ const routes = [
     meta: { public: true },
   },
   {
-    path: "/dashboard",
-    name: "Dashboard",
-    component: () => import("@/views/Dashboard.vue"),
-    meta: { requiresAuth: true },
+    path: '/admin',
+    component: OfficeAdminLandingPage,
+    meta: { requiresAuth: true, forAdmin: true }
+  },
+  {
+    path: '/dashboard',
+    component: Dashboard,
+    meta: { requiresAuth: true, forCustomer: true }
   },
   {
     path: "/system-admin",
@@ -42,20 +50,39 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to, from, next) => {
-  const { user, isLoading } = useAuth();
+  const auth = getAuth();
+  const user = auth.currentUser;
 
-  // Wait for auth to initialize
-  while (isLoading.value) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
+  // If no user is logged in and route requires auth, redirect to login
+  if (to.meta.requiresAuth && !user) {
+    next('/login');
+    return;
   }
 
-  if (to.meta.requiresAuth && !user.value) {
-    next("/signin");
-  } else if (to.meta.roles && !to.meta.roles.includes(user.value?.role)) {
-    next("/unauthorized");
-  } else {
-    next();
+  // If user is logged in
+  if (user) {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        
+        // Redirect based on role
+        if (userData.role === 'customer' && to.meta.forAdmin) {
+          next('/dashboard'); // Customer trying to access admin page
+          return;
+        }
+        
+        if (userData.role === 'office_admin' && to.meta.forCustomer) {
+          next('/admin'); // Admin trying to access customer page
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Error checking user role:', error);
+    }
   }
+
+  next();
 });
 
 export default router;
