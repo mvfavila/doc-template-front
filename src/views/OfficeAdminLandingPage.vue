@@ -67,12 +67,48 @@
             </div>
           </div>
         </div>
-        <document-list
-          :documents="filteredCompletedDocuments"
-          :customers="customers"
-          :readonly="true"
-          :status-mapper="mapAdminStatus"
-        />
+        <div class="documents-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Modelo</th>
+                <th>Criado em</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="doc in filteredCompletedDocuments" :key="doc.id">
+                <td>{{ getCustomerName(doc.customerId) }}</td>
+                <td>{{ doc.templateName || 'Documento' }}</td>
+                <td>{{ formatDate(doc.createdAt) }}</td>
+                <td class="actions">
+                  <button 
+                    @click="downloadFile(doc.generatedPdfUrl, `${getCustomerName(doc.customerId)}_${doc.templateName || 'documento'}.pdf`)"
+                    :disabled="!doc.generatedPdfUrl"
+                    class="action-button"
+                  >
+                    PDF
+                  </button>
+                  <button 
+                    @click="downloadFile(doc.generatedDocxUrl, `${getCustomerName(doc.customerId)}_${doc.templateName || 'documento'}.docx`)"
+                    :disabled="!doc.generatedDocxUrl"
+                    class="action-button"
+                  >
+                    DOCX
+                  </button>
+                  <span v-if="!doc.generatedPdfUrl || !doc.generatedDocxUrl" class="error-badge">
+                    !
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <div v-if="!filteredCompletedDocuments.length" class="empty-state">
+            Nenhum documento encontrado
+          </div>
+        </div>
       </section>
     </div>
 
@@ -110,12 +146,14 @@ import {
   updateDoc,
   serverTimestamp
 } from 'firebase/firestore'
+import { getStorage, ref as storageRef, getDownloadURL } from "firebase/storage";
 import DocumentList from '@/components/admin/DocumentList.vue';
 import FormModal from '@/components/client/FormModal.vue';
 import FormReviewModal from '@/components/admin/FormReviewModal.vue';
 
 const db = getFirestore()
 const auth = getAuth();
+const storage = getStorage();
 
 // Data
 const documents = ref([])
@@ -205,15 +243,25 @@ const fetchDocuments = async () => {
       ))
     ])
     
-    documents.value = docsSnapshot.docs.map(doc => {
-      const data = doc.data();
+    // Process documents with fresh URLs
+    documents.value = await Promise.all(docsSnapshot.docs.map(async (docSnapshot) => {
+      const data = docSnapshot.data();
       const template = templates.value.find(t => t.id === data.templateId);
+      
+      // Generate fresh download URLs
+      const [pdfUrl, docxUrl] = await Promise.all([
+        generateFreshUrl(data.generatedPdfPath),
+        generateFreshUrl(data.generatedDocxPath)
+      ]);
+      
       return {
-        id: doc.id,
+        id: docSnapshot.id,
         templateName: template?.name || 'Documento',
-        ...data
-      }
-    });
+        ...data,
+        generatedPdfUrl: pdfUrl,
+        generatedDocxUrl: docxUrl
+      };
+    }));
     
     customers.value = custsSnapshot.docs.map(doc => ({
       id: doc.id,
@@ -232,15 +280,29 @@ const fetchDocuments = async () => {
   }
 }
 
-const mapAdminStatus = (status) => {
-  const statusMap = {
-    pending: 'Pendente',
-    submitted: 'Em revisão',
-    approved: 'Aprovado',
-    completed: 'Concluído'
+const generateFreshUrl = async (storagePath) => {
+  if (!storagePath) return null;
+  
+  try {
+    const fileRef = storageRef(storage, storagePath);
+    return await getDownloadURL(fileRef);
+  } catch (error) {
+    console.error("Error generating download URL:", error);
+    return null;
   }
-  return statusMap[status] || status
-}
+};
+
+const formatDate = (timestamp) => {
+  if (!timestamp) return 'N/A';
+  const date = timestamp.toDate();
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
 
 const handleEditDocument = (doc) => {
   activeDocument.value = {
@@ -305,6 +367,34 @@ const resetFilters = () => {
     templateId: ''
   }
 }
+
+const getCustomerName = (customerId) => {
+  const customer = customers.value.find(c => c.id === customerId);
+  return customer?.name || 'Cliente Desconhecido';
+};
+
+const downloadFile = (url, filename) => {
+  if (!url) {
+    alert("Link de download não disponível. Tente novamente mais tarde.");
+    return;
+  }
+  
+  // Create a temporary anchor element
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  
+  // Fallback if the direct download doesn't work
+  setTimeout(() => {
+    if (!document.body.querySelector(`iframe[src="${url}"]`)) {
+      window.open(url, '_blank');
+    }
+  }, 1000);
+};
 
 // Lifecycle
 onMounted(async () => {
@@ -373,6 +463,91 @@ onMounted(async () => {
   padding: 2rem;
   text-align: center;
   color: #666;
+}
+
+.documents-table {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.documents-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.documents-table th,
+.documents-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.documents-table th {
+  background-color: #f5f5f5;
+  position: sticky;
+  top: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.action-button {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  background-color: #42b983;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  border: none;
+  cursor: pointer;
+}
+
+.action-button:hover {
+  background-color: #3aa876;
+}
+
+.action-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}
+
+.error-badge {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background-color: #e74c3c;
+  color: white;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 18px;
+  font-size: 12px;
+  margin-left: 5px;
+  cursor: help;
+  position: relative;
+}
+
+.error-badge:hover::after {
+  content: "Arquivo indisponível";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 100;
 }
 
 @media (max-width: 768px) {
