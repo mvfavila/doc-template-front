@@ -157,177 +157,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Form Management -->
-      <div class="card">
-        <h2>Formulários Submetidos</h2>
-        <div class="form-filters">
-          <select v-model="formFilter">
-            <option value="all">Todos</option>
-            <option value="pending">Pendentes</option>
-            <option value="approved">Aprovados</option>
-            <option value="completed">Concluído</option>
-          </select>
-        </div>
-
-        <div class="forms-list">
-          <div v-for="form in filteredForms" :key="form.id" class="form-item">
-            <div class="form-header">
-              <h3>{{ getTemplateName(form.templateId) }}</h3>
-              <span class="status-badge" :class="form.status">
-                {{ form.status }}
-              </span>
-            </div>
-            <p>Cliente: {{ getCustomerName(form.customerId) }}</p>
-            <button @click="reviewForm(form)">Revisar</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Customer Management -->
-      <div class="card">
-        <h2>Formulários de Clientes</h2>
-        
-        <div class="search-box">
-          <input v-model="clientSearch" placeholder="Buscar cliente..." @keyup.enter="searchClient" />
-          <button @click="searchClient">Buscar</button>
-        </div>
-
-        <!-- Show search results -->
-        <div v-if="clients.length > 0 && !selectedClient" class="search-results">
-          <h3>Resultados da Busca</h3>
-          <ul>
-            <li v-for="client in clients" :key="client.id" @click="selectClient(client)" class="client-item">
-              {{ client.name }} - {{ client.email }}
-            </li>
-          </ul>
-        </div>
-
-        <div v-if="selectedClient">
-          <h3>Formulários de {{ selectedClient.name }}</h3>
-          
-          <div class="client-forms">
-            <div class="pending-forms">
-              <h4>Pendentes</h4>
-              <form-list 
-                :forms="clientPendingForms"
-                @open="openClientForm"
-              />
-            </div>
-            
-            <div class="completed-forms">
-              <h4>Enviados</h4>
-              <form-list 
-                :forms="clientCompletedForms"
-                :readonly="true"
-                @open="openClientForm"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- Form Modal -->
-        <form-modal
-          v-if="selectedForm"
-          :form="selectedForm"
-          :template-id="selectedForm.templateId"
-          :readonly="isReadonly"
-          @close="selectedForm = null"
-          @submit="handleAdminFormSubmit"
-        />
-      </div>
-
-      <!-- Document Management -->
-      <div class="card">
-        <h2>Documentos</h2>
-        
-        <!-- Search and Filter Controls -->
-        <div class="document-controls">
-          <div class="search-box">
-            <input 
-              v-model="documentSearch" 
-              placeholder="Buscar por cliente ou modelo..."
-              @keyup.enter="fetchDocuments"
-            />
-            <button @click="fetchDocuments">Buscar</button>
-          </div>
-          
-          <div class="filter-controls">
-            <select v-model="documentFilter.customerId">
-              <option value="">Todos os clientes</option>
-              <option 
-                v-for="customer in customers" 
-                :key="customer.id" 
-                :value="customer.id"
-              >
-                {{ customer.name }}
-              </option>
-            </select>
-            
-            <select v-model="documentFilter.templateId">
-              <option value="">Todos os modelos</option>
-              <option 
-                v-for="template in templates" 
-                :key="template.id" 
-                :value="template.id"
-              >
-                {{ template.name }}
-              </option>
-            </select>
-            
-            <button @click="resetFilters">Limpar filtros</button>
-          </div>
-        </div>
-        
-        <!-- Documents Table -->
-        <div class="documents-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Modelo</th>
-                <th>Criado em</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="doc in filteredDocuments" :key="doc.id">
-                <td>{{ getCustomerName(doc.customerId) }}</td>
-                <td>{{ getTemplateName(doc.templateId) }}</td>
-                <td>{{ formatDate(doc.updatedAt) }}</td>
-                <td class="actions">
-                  <button 
-                    @click="downloadFile(doc.generatedPdfUrl, `${getCustomerName(doc.customerId)}_${getTemplateName(doc.templateId)}.pdf`)"
-                    :disabled="!doc.generatedPdfUrl"
-                    class="action-button"
-                  >
-                    PDF
-                  </button>
-                  <button 
-                    @click="downloadFile(doc.generatedDocxUrl, `${getCustomerName(doc.customerId)}_${getTemplateName(doc.templateId)}.docx`)"
-                    :disabled="!doc.generatedDocxUrl"
-                    class="action-button"
-                  >
-                    DOCX
-                  </button>
-                  <span v-if="!doc.generatedPdfUrl || !doc.generatedDocxUrl" class="error-badge">
-                    !
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          
-          <div v-if="isLoadingDocuments" class="loading-state">
-            Loading documents...
-          </div>
-          
-          <div v-if="!isLoadingDocuments && !filteredDocuments.length" class="empty-state">
-            No documents found matching your criteria
-          </div>
-        </div>
-      </div>
-      
     </section>
 
     <!-- Modals -->
@@ -342,14 +171,7 @@
       :template="selectedTemplate"
       :customers="customers"
       @close="selectedTemplate = null"
-      @assigned="refreshForms"
-    />
-
-    <form-review-modal
-      v-if="selectedForm"
-      :form="selectedForm"
-      @close="selectedForm = null"
-      @saved="refreshForms"
+      @assigned="handleTemplateAssigned"
     />
   </div>
 </template>
@@ -376,36 +198,21 @@ import {
   uploadBytesResumable,
   getDownloadURL,
 } from "firebase/storage";
-import { getFunctions, httpsCallable } from "firebase/functions";
 
 // Components
 import CustomerModal from "@/components/admin/CustomerModal.vue";
 import TemplateAssignmentModal from "@/components/admin/TemplateAssignmentModal.vue";
-import FormReviewModal from "@/components/admin/FormReviewModal.vue";
 
 const db = getFirestore();
 const auth = getAuth();
 const storage = getStorage();
-const functions = getFunctions();
 
 // Data
 const customers = ref([]);
 const templates = ref([]);
-const forms = ref([]);
 const customerSearch = ref("");
-const formFilter = ref("all");
 const showCustomerModal = ref(false);
 const selectedTemplate = ref(null);
-const selectedForm = ref(null);
-
-// Document Data
-const documents = ref([]);
-const documentSearch = ref("");
-const isLoadingDocuments = ref(false);
-const documentFilter = ref({
-  customerId: "",
-  templateId: ""
-});
 
 // Template Upload Data
 const fileInput = ref(null);
@@ -416,12 +223,11 @@ const uploadInProgress = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
 
-// State
-const clients = ref([]);
-const clientSearch = ref("");
-const selectedClient = ref(null);
-const clientForms = ref([]);
-const isReadonly = ref(false);
+// Placeholder Modal Data
+const showPlaceholderModal = ref(false);
+const currentTemplate = ref(null);
+const currentPlaceholders = ref({});
+const MAX_FIELD_LENGTH = 100;
 
 let unsubscribeTemplates = null;
 
@@ -434,43 +240,6 @@ const filteredCustomers = computed(() => {
         .includes(customerSearch.value.toLowerCase()) ||
       customer.email.toLowerCase().includes(customerSearch.value.toLowerCase())
   );
-});
-
-const filteredForms = computed(() => {
-  if (formFilter.value === "all") return forms.value;
-  return forms.value.filter((form) => form.status === formFilter.value);
-});
-
-const filteredDocuments = computed(() => {
-  let filtered = documents.value;
-  
-  // Apply customer filter
-  if (documentFilter.value.customerId) {
-    filtered = filtered.filter(doc => 
-      doc.customerId === documentFilter.value.customerId
-    );
-  }
-  
-  // Apply template filter
-  if (documentFilter.value.templateId) {
-    filtered = filtered.filter(doc => 
-      doc.templateId === documentFilter.value.templateId
-    );
-  }
-  
-  // Apply search
-  if (documentSearch.value) {
-    const searchTerm = documentSearch.value.toLowerCase();
-    filtered = filtered.filter(doc => {
-      const customerName = getCustomerName(doc.customerId).toLowerCase();
-      const templateName = getTemplateName(doc.templateId).toLowerCase();
-      return (
-        customerName.includes(searchTerm) || 
-        templateName.includes(searchTerm));
-    });
-  }
-  
-  return filtered;
 });
 
 // Methods
@@ -509,29 +278,6 @@ const setupTemplateListener = async () => {
   } catch (error) {
     console.error("Error setting up template listener:", error);
     errorMessage.value = "Erro ao carregar templates";
-  }
-};
-
-const fetchForms = async () => {
-  try {
-    const user = auth.currentUser;
-    if (user) {
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (userDoc.exists()) {
-        const q = query(
-          collection(db, "forms"),
-          where("officeId", "==", userDoc.data().officeId)
-        );
-        const snapshot = await getDocs(q);
-        forms.value = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-      }
-    }
-  } catch (error) {
-    console.error("Error fetching forms:", error);
-    errorMessage.value = "Erro ao carregar formulários";
   }
 };
 
@@ -679,132 +425,13 @@ const assignTemplate = (template) => {
   selectedTemplate.value = template;
 };
 
-const reviewForm = (form) => {
-  selectedForm.value = form;
+const handleTemplateAssigned = () => {
+  selectedTemplate.value = null;
+  successMessage.value = "Template atribuído com sucesso!";
+  setTimeout(() => successMessage.value = "", 3000);
 };
 
-const getTemplateName = (templateId) => {
-  const template = templates.value.find((t) => t.id === templateId);
-  return template?.name || "Template Desconhecido";
-};
-
-const getCustomerName = (customerId) => {
-  const customer = customers.value.find((c) => c.id === customerId);
-  return customer?.name || "Cliente Desconhecido";
-};
-
-const refreshCustomers = async () => {
-  await fetchCustomers();
-};
-
-const refreshForms = async () => {
-  await fetchForms();
-};
-
-const fetchDocuments = async () => {
-  try {
-    isLoadingDocuments.value = true;
-    const user = auth.currentUser;
-    if (!user) return;
-    
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    if (!userDoc.exists()) return;
-    
-    const q = query(
-      collection(db, "forms"),
-      where("officeId", "==", userDoc.data().officeId),
-      where("status", "==", "completed")
-    );
-    
-    const snapshot = await getDocs(q);
-    documents.value = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
-      const docData = docSnapshot.data();
-      
-      // Generate fresh download URLs
-      const [pdfUrl, docxUrl] = await Promise.all([
-        generateFreshUrl(docData.generatedPdfPath),
-        generateFreshUrl(docData.generatedDocxPath)
-      ]);
-      
-      return {
-        id: docSnapshot.id,
-        ...docData,
-        generatedPdfUrl: pdfUrl,
-        generatedDocxUrl: docxUrl
-      };
-    }));
-    
-  } catch (error) {
-    console.error("Error fetching documents:", error);
-  } finally {
-    isLoadingDocuments.value = false;
-  }
-};
-
-const generateFreshUrl = async (storagePath) => {
-  if (!storagePath) return null;
-  
-  try {
-    // Try to generate a fresh download URL
-    const fileRef = storageRef(storage, storagePath);
-    return await getDownloadURL(fileRef);
-  } catch (error) {
-    console.error("Error generating download URL:", error);
-    return null;
-  }
-};
-
-const resetFilters = () => {
-  documentSearch.value = "";
-  documentFilter.value = {
-    customerId: "",
-    templateId: ""
-  };
-};
-
-const formatDate = (timestamp) => {
-  if (!timestamp) return 'N/A';
-  const date = timestamp.toDate();
-  return date.toLocaleString();
-};
-
-const downloadFile = (url, filename) => {
-  if (!url) {
-    alert("Download link is not available. Please try again later.");
-    return;
-  }
-  
-  // Create a temporary anchor element
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.target = '_blank';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  
-  // Fallback if the direct download doesn't work
-  setTimeout(() => {
-    if (!document.body.querySelector(`iframe[src="${url}"]`)) {
-      window.open(url, '_blank');
-    }
-  }, 1000);
-};
-
-// Lifecycle
-onMounted(async () => {
-  await fetchCustomers();
-  await setupTemplateListener();
-  await fetchForms();
-  fetchDocuments();
-});
-
-// Add these new data properties
-const showPlaceholderModal = ref(false);
-const currentTemplate = ref(null);
-const currentPlaceholders = ref<Placeholders>({});
-
-const editPlaceholderMasks = (template: { placeholders?: Placeholders }) => {
+const editPlaceholderMasks = (template) => {
   currentTemplate.value = template;
   currentPlaceholders.value = template.placeholders 
     ? JSON.parse(JSON.stringify(template.placeholders))
@@ -832,8 +459,6 @@ const savePlaceholderConfig = async () => {
   }
 };
 
-const MAX_FIELD_LENGTH = 100;
-
 const validateFieldLength = (event: Event, field: string, maxLength: number) => {
   const target = event.target as HTMLInputElement;
   const value = target.value;
@@ -852,60 +477,15 @@ const validateFieldLength = (event: Event, field: string, maxLength: number) => 
   }
 };
 
-// Computed
-const clientPendingForms = computed(() =>
-  clientForms.value.filter(form => form.status === 'pending')
-);
-
-const clientCompletedForms = computed(() =>
-  clientForms.value.filter(form => form.status === 'submitted' || form.status === 'approved')
-);
-
-// Methods
-const searchClient = async () => {
-  const q = query(
-    collection(db, "users"),
-    where("role", "==", "customer"),
-    where("name", ">=", clientSearch.value),
-    where("name", "<=", clientSearch.value + "\uf8ff")
-  );
-  const snapshot = await getDocs(q);
-  clients.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+const refreshCustomers = async () => {
+  await fetchCustomers();
 };
 
-const selectClient = async (client) => {
-  selectedClient.value = client;
-  const q = query(
-    collection(db, "forms"),
-    where("customerId", "==", client.id)
-  );
-  const snapshot = await getDocs(q);
-  clientForms.value = snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }));
-};
-
-const openClientForm = (form) => {
-  selectedForm.value = form;
-  isReadonly.value = form.status === 'submitted' || form.status === 'approved';
-};
-
-const handleAdminFormSubmit = async (formData) => {
-  try {
-    await updateDoc(doc(db, "forms", selectedForm.value.id), {
-      formData: formData,
-      status: "submitted",
-      submittedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      submittedBy: auth.currentUser.uid,
-    });
-    await selectClient(selectedClient.value); // Refresh forms
-    selectedForm.value = null;
-  } catch (error) {
-    console.error("Error submitting form:", error);
-  }
-};
+// Lifecycle
+onMounted(async () => {
+  await fetchCustomers();
+  await setupTemplateListener();
+});
 </script>
 
 <style scoped>
