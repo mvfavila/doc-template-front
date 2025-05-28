@@ -115,11 +115,10 @@ const handleSignIn = async () => {
     router.push("/dashboard");
   } catch (err) {
     switch (err.code) {
+      case "auth/user-disabled":
       case "auth/user-not-found":
-        error.value = "Usuário não encontrado";
-        break;
       case "auth/wrong-password":
-        error.value = "Senha incorreta";
+        error.value = "Usuário/senha inválido(s)";
         break;
       case "auth/too-many-requests":
         error.value =

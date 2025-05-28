@@ -3,9 +3,31 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
       allow read: if isSystemAdmin() || isOfficeAdmin() || isCustomer();
+      allow update: if 
+        // User is authenticated
+        request.auth != null &&
+        // Only allow updating isActive field
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isActive', 'lastModifiedBy']) &&
+        request.resource.data.lastModifiedBy == request.auth.uid &&
+        // Updater is an office admin in the same office
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'office_admin' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.officeId == resource.data.officeId &&
+        // Target is a customer
+        resource.data.role == 'customer';
       allow write: if isSystemAdmin();
       allow create: if isOfficeAdmin()
           && request.resource.data.role == 'customer';
+    }
+
+    match /auditLogs/{officeId}/userLogs/{logId} {
+      allow read: if isSystemAdmin();
+      allow create: if false;
+    }
+
+    // Allow creation of office documents (but not modification)
+    match /auditLogs/{officeId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false;
     }
     
     match /offices/{officeId} {
