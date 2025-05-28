@@ -133,7 +133,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getAuth } from "firebase/auth";
 import { 
   getFirestore, 
@@ -141,10 +141,10 @@ import {
   query, 
   where,
   getDoc,
-  getDocs,
   doc,
   updateDoc,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot
 } from 'firebase/firestore'
 import { getStorage, ref as storageRef, getDownloadURL } from "firebase/storage";
 import DocumentList from '@/components/admin/DocumentList.vue';
@@ -170,7 +170,85 @@ const completedFilter = ref({
   templateId: ''
 })
 
+// Listeners
+let unsubscribeDocuments = null;
+let unsubscribeCustomers = null;
+let unsubscribeTemplates = null;
+
+const setupRealtimeListeners = async () => {
+  try {
+    isLoading.value = true;
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    if (!userDoc.exists()) return;
+    
+    const officeId = userDoc.data().officeId;
+    
+    // Set up real-time listeners
+    unsubscribeDocuments = onSnapshot(
+      query(collection(db, 'forms'), where('officeId', '==', officeId)),
+      async (snapshot) => {
+        documents.value = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
+          const data = docSnapshot.data();
+          const template = templatesMap.value[data.templateId];
+          
+          const [pdfUrl, docxUrl] = await Promise.all([
+            generateFreshUrl(data.generatedPdfPath),
+            generateFreshUrl(data.generatedDocxPath)
+          ]);
+          
+          return {
+            id: docSnapshot.id,
+            templateName: template?.name || 'Documento',
+            ...data,
+            generatedPdfUrl: pdfUrl,
+            generatedDocxUrl: docxUrl
+          };
+        }));
+      }
+    );
+    
+    unsubscribeCustomers = onSnapshot(
+      query(
+        collection(db, 'users'),
+        where('role', '==', 'customer'),
+        where('officeId', '==', officeId)
+      ),
+      (snapshot) => {
+        customers.value = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      }
+    );
+    
+    unsubscribeTemplates = onSnapshot(
+      query(collection(db, 'templates'), where('officeId', '==', officeId)),
+      (snapshot) => {
+        templates.value = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      }
+    );
+    
+  } catch (error) {
+    console.error('Error setting up listeners:', error);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 // Computed
+const templatesMap = computed(() => {
+  return templates.value.reduce((map, template) => {
+    map[template.id] = template;
+    return map;
+  }, {});
+});
+
 const pendingDocuments = computed(() => 
   documents.value.filter(doc => doc.status === 'pending')
 )
@@ -218,68 +296,6 @@ const filteredCompletedDocuments = computed(() => {
 })
 
 // Methods
-const fetchDocuments = async () => {
-  try {
-    isLoading.value = true;
-    const user = auth.currentUser;
-    const userDoc = await getDoc(doc(db, 'users', user.uid))
-    if (!userDoc.exists()) return
-    
-    const officeId = userDoc.data().officeId
-    
-    const [docsSnapshot, custsSnapshot, tmplsSnapshot] = await Promise.all([
-      getDocs(query(
-        collection(db, 'forms'),
-        where('officeId', '==', officeId)
-      )),
-      getDocs(query(
-        collection(db, 'users'),
-        where('role', '==', 'customer'),
-        where('officeId', '==', officeId)
-      )),
-      getDocs(query(
-        collection(db, 'templates'),
-        where('officeId', '==', officeId)
-      ))
-    ])
-    
-    // Process documents with fresh URLs
-    documents.value = await Promise.all(docsSnapshot.docs.map(async (docSnapshot) => {
-      const data = docSnapshot.data();
-      const template = templates.value.find(t => t.id === data.templateId);
-      
-      // Generate fresh download URLs
-      const [pdfUrl, docxUrl] = await Promise.all([
-        generateFreshUrl(data.generatedPdfPath),
-        generateFreshUrl(data.generatedDocxPath)
-      ]);
-      
-      return {
-        id: docSnapshot.id,
-        templateName: template?.name || 'Documento',
-        ...data,
-        generatedPdfUrl: pdfUrl,
-        generatedDocxUrl: docxUrl
-      };
-    }));
-    
-    customers.value = custsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }))
-    
-    templates.value = tmplsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }))
-    
-  } catch (error) {
-    console.error('Error fetching data:', error)
-  } finally {
-    isLoading.value = false
-  }
-}
-
 const generateFreshUrl = async (storagePath) => {
   if (!storagePath) return null;
   
@@ -325,7 +341,6 @@ const handleFormSaved = async (updatedForm) => {
       status: updatedForm.status,
       updatedAt: serverTimestamp()
     });
-    await fetchDocuments();
     activeDocument.value = null;
   } catch (error) {
     console.error('Error saving form:', error);
@@ -339,7 +354,6 @@ const handleFormSave = async (formData) => {
       status: 'pending',
       updatedAt: serverTimestamp()
     });
-    await fetchDocuments();
     activeDocument.value = null;
   } catch (error) {
     console.error('Error saving form:', error);
@@ -354,7 +368,6 @@ const handleDocumentSubmit = async (formData) => {
       status: newStatus,
       updatedAt: serverTimestamp()
     });
-    await fetchDocuments();
     activeDocument.value = null;
   } catch (error) {
     console.error('Error submitting document:', error);
@@ -398,8 +411,14 @@ const downloadFile = (url, filename) => {
 
 // Lifecycle
 onMounted(async () => {
-  await fetchDocuments()
+  await setupRealtimeListeners();
 })
+
+onUnmounted(() => {
+  if (unsubscribeDocuments) unsubscribeDocuments();
+  if (unsubscribeCustomers) unsubscribeCustomers();
+  if (unsubscribeTemplates) unsubscribeTemplates();
+});
 </script>
 
 <style scoped>
