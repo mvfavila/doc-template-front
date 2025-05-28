@@ -3,6 +3,16 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
       allow read: if isSystemAdmin() || isOfficeAdmin() || isCustomer();
+      allow update: if 
+        // User is authenticated
+        request.auth != null &&
+        // Only allow updating isActive field
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["isActive"]) &&
+        // Updater is an office admin in the same office
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "office_admin" &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.officeId == resource.data.officeId &&
+        // Target is a customer
+        resource.data.role == "customer";
       allow write: if isSystemAdmin();
       allow create: if isOfficeAdmin()
           && request.resource.data.role == 'customer';

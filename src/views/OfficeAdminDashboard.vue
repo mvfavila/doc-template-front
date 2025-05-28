@@ -282,7 +282,15 @@ const setupTemplateListener = async () => {
 };
 
 const toggleCustomerStatus = async (customerId, isActive) => {
-  await updateDoc(doc(db, "users", customerId), { isActive });
+  try {
+    await updateDoc(doc(db, "users", customerId), { isActive });
+    
+    successMessage.value = `Usuário ${isActive ? 'desbloqueado' : 'bloqueado'} com sucesso!`;
+    setTimeout(() => successMessage.value = "", 3000);
+  } catch (error) {
+    console.error("Error toggling user status:", error);
+    errorMessage.value = "Erro ao atualizar status do usuário: " + error.message;
+  }
   await fetchCustomers();
 };
 
