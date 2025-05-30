@@ -1,35 +1,32 @@
 <template>
   <div class="modal-overlay">
     <div class="modal-content">
-      <h2>Revisar Formulário</h2>
-      <p>Template: {{ templateName }}</p>
+      <h2>Revisar {{ templateName }}</h2>
       
       <form @submit.prevent="submitForm">
-        <div v-for="(placeholder, key) in templatePlaceholders" :key="key" class="review-field">
-          <div class="field-header">
-            <h3>{{ placeholder.alias || key }}</h3>
-            <span class="field-value">{{ formData[key]?.value || '-' }}</span>
-          </div>
-          
-          <div class="review-controls">
-            <label class="approve-checkbox">
+        <div v-for="(placeholder, key) in templatePlaceholders" :key="key" class="compact-field">
+          <div class="field-summary">
+            <div class="field-title">
+              <h3>{{ placeholder.alias || key }}</h3>
+              <span class="value-preview">{{ formData[key]?.value || '(vazio)' }}</span>
+            </div>
+            <label class="approve-toggle">
               <input 
                 type="checkbox" 
                 v-model="formData[key].approved"
                 @change="handleApprovalChange(key)"
               >
-              Aprovar
+              <span class="toggle-label">{{ formData[key].approved ? 'Aprovado' : 'Aprovar' }}</span>
             </label>
-            
-            <div class="comment-section">
-              <label>Comentário:</label>
-              <textarea
-                v-model="formData[key].comment"
-                :disabled="formData[key].approved"
-                placeholder="Adicione comentários se necessário"
-                @input="handleCommentChange(key)"
-              ></textarea>
-            </div>
+          </div>
+
+          <div class="field-details" :class="{ 'show-comment': !formData[key].approved }">
+            <textarea
+              v-model="formData[key].comment"
+              :disabled="formData[key].approved"
+              placeholder="Adicionar comentário..."
+              @input="handleCommentChange(key)"
+            ></textarea>
           </div>
         </div>
 
@@ -73,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import FormField from '@/components/FormField.vue';
@@ -112,6 +109,13 @@ const isSaving = ref(false);
 const saveSuccess = ref(false);
 let saveSuccessTimeout: number;
 
+// Keyboard event handler
+const handleEscKey = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    emit('close');
+  }
+};
+
 // Computed properties
 const allFieldsReviewed = computed(() => {
   const fields = Object.keys(templatePlaceholders.value);
@@ -135,7 +139,10 @@ const allFieldsApproved = computed(() => {
   });
 });
 
+// Lifecycle
 onMounted(async () => {
+  window.addEventListener('keydown', handleEscKey);
+
   const templateRef = doc(db, 'templates', props.form.templateId);
   const templateSnap = await getDoc(templateRef);
   
@@ -164,6 +171,11 @@ onMounted(async () => {
   });
 });
 
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleEscKey);
+});
+
+// Methods
 const handleApprovalChange = (fieldKey: string) => {
   if (formData.value[fieldKey].approved) {
     formData.value[fieldKey].comment = '';
@@ -411,5 +423,105 @@ button {
 .generate-documents-button:disabled {
   background-color: #bbd9f0;
   cursor: not-allowed;
+}
+
+.compact-field {
+  margin-bottom: 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.compact-field:hover {
+  border-color: #42b983;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.field-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #f9f9f9;
+  border-radius: 6px 6px 0 0;
+}
+
+.field-title {
+  flex: 1;
+}
+
+.field-title h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+.value-preview {
+  display: block;
+  font-size: 0.9rem;
+  color: #2c3e50;
+  font-weight: 500;
+  margin-top: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.approve-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  transition: all 0.2s;
+}
+
+.approve-toggle:hover {
+  border-color: #42b983;
+}
+
+.toggle-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.field-details {
+  padding: 0 1rem;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.field-details.show-comment {
+  max-height: 120px;
+  padding: 0.75rem 1rem;
+  background: #fafafa;
+  border-top: 1px solid #eee;
+}
+
+.field-details textarea {
+  width: calc(100% - 1rem); /* Account for padding */
+  min-height: 60px;
+  padding: 0.5rem;
+  margin-right: 0.5rem; /* Add right padding */
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  resize: vertical;
+  background: white;
+}
+
+.field-details textarea:focus {
+  outline: none;
+  border-color: #42b983;
+  box-shadow: 0 0 0 2px rgba(66, 185, 131, 0.2);
+}
+
+.field-details.show-comment textarea {
+  border-color: #f39c12;
+  background-color: #fffaf5;
 }
 </style>
