@@ -11,9 +11,16 @@
       <section class="document-section">
         <div class="section-header">
           <h2>Documentos Pendentes</h2>
+          <div v-if="loadingStates.pending" class="loading-indicator">
+            <span class="spinner"></span>
+          </div>
           <div class="search-box">
             <input v-model="pendingSearch" placeholder="Buscar pendentes..."/>
           </div>
+        </div>
+        <div v-if="errors.pending" class="error-message">
+          {{ errors.pending }}
+          <button @click="retryLoading">Tentar novamente</button>
         </div>
         <document-list
           :documents="filteredPendingDocuments"
@@ -26,9 +33,16 @@
       <section class="document-section">
         <div class="section-header">
           <h2>Documentos para Revisão</h2>
+          <div v-if="loadingStates.review" class="loading-indicator">
+            <span class="spinner"></span>
+          </div>
           <div class="search-box">
             <input v-model="reviewSearch" placeholder="Buscar para revisão..."/>
           </div>
+        </div>
+        <div v-if="errors.review" class="error-message">
+          {{ errors.review }}
+          <button @click="retryLoading">Tentar novamente</button>
         </div>
         <document-list
           :documents="filteredReviewDocuments"
@@ -41,6 +55,9 @@
       <section class="document-section">
         <div class="section-header">
           <h2>Documentos Concluídos</h2>
+          <div v-if="loadingStates.completed" class="loading-indicator">
+            <span class="spinner"></span>
+          </div>
           <div class="advanced-search">
             <div class="filter-controls">
               <select v-model="completedFilter.customerId">
@@ -66,6 +83,10 @@
               <button @click="resetFilters">Limpar filtros</button>
             </div>
           </div>
+        </div>
+        <div v-if="errors.completed" class="error-message">
+          {{ errors.completed }}
+          <button @click="retryLoading">Tentar novamente</button>
         </div>
         <div class="documents-table">
           <table>
@@ -133,7 +154,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getAuth } from "firebase/auth";
 import { 
   getFirestore, 
@@ -141,10 +162,10 @@ import {
   query, 
   where,
   getDoc,
-  getDocs,
   doc,
   updateDoc,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot
 } from 'firebase/firestore'
 import { getStorage, ref as storageRef, getDownloadURL } from "firebase/storage";
 import DocumentList from '@/components/admin/DocumentList.vue';
@@ -160,7 +181,21 @@ const documents = ref([])
 const customers = ref([])
 const templates = ref([])
 const activeDocument = ref(null)
-const isLoading = ref(false)
+const loadingStates = ref({
+  pending: false,
+  review: false,
+  completed: false,
+  customers: false,
+  templates: false
+});
+
+const errors = ref({
+  pending: null,
+  review: null,
+  completed: null,
+  customers: null,
+  templates: null
+});
 
 // Search and filters
 const pendingSearch = ref('')
@@ -170,7 +205,167 @@ const completedFilter = ref({
   templateId: ''
 })
 
+// Listeners
+let unsubscribeDocuments = null;
+let unsubscribeCustomers = null;
+let unsubscribeTemplates = null;
+
+const setupRealtimeListeners = async () => {
+  try {
+    loadingStates.value = {
+      pending: true,
+      review: true,
+      completed: true,
+      customers: true,
+      templates: true
+    };
+    
+    errors.value = {
+      pending: null,
+      review: null,
+      completed: null,
+      customers: null,
+      templates: null
+    };
+
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    if (!userDoc.exists()) return;
+    
+    const officeId = userDoc.data().officeId;
+    
+    // Set up real-time listeners
+    unsubscribeDocuments = onSnapshot(
+      query(collection(db, 'forms'), where('officeId', '==', officeId)),
+      async (snapshot) => {
+        try {
+          loadingStates.value.pending = true;
+          loadingStates.value.review = true;
+          loadingStates.value.completed = true;
+          
+          documents.value = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
+            const data = docSnapshot.data();
+            const template = templatesMap.value[data.templateId];
+            
+            const [pdfUrl, docxUrl] = await Promise.all([
+              generateFreshUrl(data.generatedPdfPath),
+              generateFreshUrl(data.generatedDocxPath)
+            ]);
+            
+            return {
+              id: docSnapshot.id,
+              templateName: template?.name || 'Documento',
+              ...data,
+              generatedPdfUrl: pdfUrl,
+              generatedDocxUrl: docxUrl
+            };
+          }));
+          
+          errors.value.pending = null;
+          errors.value.review = null;
+          errors.value.completed = null;
+        } catch (error) {
+          errors.value.pending = 'Erro ao carregar documentos pendentes';
+          errors.value.review = 'Erro ao carregar documentos para revisão';
+          errors.value.completed = 'Erro ao carregar documentos concluídos';
+          logger.error('Document processing error:', error);
+        } finally {
+          loadingStates.value.pending = false;
+          loadingStates.value.review = false;
+          loadingStates.value.completed = false;
+        }
+      },
+      (error) => {
+        errors.value.pending = 'Erro na conexão com documentos pendentes';
+        errors.value.review = 'Erro na conexão com documentos para revisão';
+        errors.value.completed = 'Erro na conexão com documentos concluídos';
+        loadingStates.value.pending = false;
+        loadingStates.value.review = false;
+        loadingStates.value.completed = false;
+      }
+    );
+    
+    unsubscribeCustomers = onSnapshot(
+      query(
+        collection(db, 'users'),
+        where('role', '==', 'customer'),
+        where('officeId', '==', officeId)
+      ),
+      (snapshot) => {
+        try {
+          loadingStates.value.customers = true;
+          customers.value = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          errors.value.customers = null;
+        } catch (error) {
+          errors.value.customers = 'Erro ao carregar clientes';
+          logger.error('Customer processing error:', error);
+        } finally {
+          loadingStates.value.customers = false;
+        }
+      },
+      (error) => {
+        errors.value.customers = 'Erro na conexão com clientes';
+        loadingStates.value.customers = false;
+      }
+    );
+    
+    unsubscribeTemplates = onSnapshot(
+      query(collection(db, 'templates'), where('officeId', '==', officeId)),
+      (snapshot) => {
+        try {
+          loadingStates.value.templates = true;
+          templates.value = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          errors.value.templates = null;
+        } catch (error) {
+          errors.value.templates = 'Erro ao carregar modelos';
+          logger.error('Template processing error:', error);
+        } finally {
+          loadingStates.value.templates = false;
+        }
+      },
+      (error) => {
+        errors.value.templates = 'Erro na conexão com modelos';
+        loadingStates.value.templates = false;
+      }
+    );
+    
+  } catch (error) {
+    logger.error('Initial setup error:', error);
+    // Set global error state
+    errors.value = {
+      pending: 'Erro inicial no carregamento',
+      review: 'Erro inicial no carregamento',
+      completed: 'Erro inicial no carregamento',
+      customers: 'Erro inicial no carregamento',
+      templates: 'Erro inicial no carregamento'
+    };
+  } finally {
+    loadingStates.value = {
+      pending: false,
+      review: false,
+      completed: false,
+      customers: false,
+      templates: false
+    };
+  }
+};
+
 // Computed
+const templatesMap = computed(() => {
+  return templates.value.reduce((map, template) => {
+    map[template.id] = template;
+    return map;
+  }, {});
+});
+
 const pendingDocuments = computed(() => 
   documents.value.filter(doc => doc.status === 'pending')
 )
@@ -218,67 +413,20 @@ const filteredCompletedDocuments = computed(() => {
 })
 
 // Methods
-const fetchDocuments = async () => {
-  try {
-    isLoading.value = true;
-    const user = auth.currentUser;
-    const userDoc = await getDoc(doc(db, 'users', user.uid))
-    if (!userDoc.exists()) return
-    
-    const officeId = userDoc.data().officeId
-    
-    const [docsSnapshot, custsSnapshot, tmplsSnapshot] = await Promise.all([
-      getDocs(query(
-        collection(db, 'forms'),
-        where('officeId', '==', officeId)
-      )),
-      getDocs(query(
-        collection(db, 'users'),
-        where('role', '==', 'customer'),
-        where('officeId', '==', officeId)
-      )),
-      getDocs(query(
-        collection(db, 'templates'),
-        where('officeId', '==', officeId)
-      ))
-    ])
-    
-    // Process documents with fresh URLs
-    documents.value = await Promise.all(docsSnapshot.docs.map(async (docSnapshot) => {
-      const data = docSnapshot.data();
-      const template = templates.value.find(t => t.id === data.templateId);
-      
-      // Generate fresh download URLs
-      const [pdfUrl, docxUrl] = await Promise.all([
-        generateFreshUrl(data.generatedPdfPath),
-        generateFreshUrl(data.generatedDocxPath)
-      ]);
-      
-      return {
-        id: docSnapshot.id,
-        templateName: template?.name || 'Documento',
-        ...data,
-        generatedPdfUrl: pdfUrl,
-        generatedDocxUrl: docxUrl
-      };
-    }));
-    
-    customers.value = custsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }))
-    
-    templates.value = tmplsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }))
-    
-  } catch (error) {
-    console.error('Error fetching data:', error)
-  } finally {
-    isLoading.value = false
-  }
-}
+const retryLoading = async () => {
+  // Clear all listeners
+  if (unsubscribeDocuments) unsubscribeDocuments();
+  if (unsubscribeCustomers) unsubscribeCustomers();
+  if (unsubscribeTemplates) unsubscribeTemplates();
+  
+  // Reset states
+  documents.value = [];
+  customers.value = [];
+  templates.value = [];
+  
+  // Restart listeners
+  await setupRealtimeListeners();
+};
 
 const generateFreshUrl = async (storagePath) => {
   if (!storagePath) return null;
@@ -325,7 +473,6 @@ const handleFormSaved = async (updatedForm) => {
       status: updatedForm.status,
       updatedAt: serverTimestamp()
     });
-    await fetchDocuments();
     activeDocument.value = null;
   } catch (error) {
     console.error('Error saving form:', error);
@@ -339,7 +486,6 @@ const handleFormSave = async (formData) => {
       status: 'pending',
       updatedAt: serverTimestamp()
     });
-    await fetchDocuments();
     activeDocument.value = null;
   } catch (error) {
     console.error('Error saving form:', error);
@@ -354,7 +500,6 @@ const handleDocumentSubmit = async (formData) => {
       status: newStatus,
       updatedAt: serverTimestamp()
     });
-    await fetchDocuments();
     activeDocument.value = null;
   } catch (error) {
     console.error('Error submitting document:', error);
@@ -398,8 +543,14 @@ const downloadFile = (url, filename) => {
 
 // Lifecycle
 onMounted(async () => {
-  await fetchDocuments()
+  await setupRealtimeListeners();
 })
+
+onUnmounted(() => {
+  if (unsubscribeDocuments) unsubscribeDocuments();
+  if (unsubscribeCustomers) unsubscribeCustomers();
+  if (unsubscribeTemplates) unsubscribeTemplates();
+});
 </script>
 
 <style scoped>
@@ -548,6 +699,53 @@ onMounted(async () => {
   border-radius: 4px;
   white-space: nowrap;
   z-index: 100;
+}
+
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(0,0,0,0.1);
+  border-radius: 50%;
+  border-top-color: #42b983;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-message {
+  padding: 1rem;
+  background-color: #ffeeee;
+  border: 1px solid #ffcccc;
+  border-radius: 4px;
+  color: #e74c3c;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.error-message button {
+  padding: 0.25rem 0.5rem;
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.error-message button:hover {
+  background-color: #c0392b;
 }
 
 @media (max-width: 768px) {

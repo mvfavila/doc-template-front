@@ -109,12 +109,11 @@ const registerCustomer = async () => {
 
     // Reset form on success
     newCustomer.value = { name: "", email: "", password: "", officeId: "" };
-    await fetchCustomers(); // Refresh the customer list
-
-    console.log("customer created:", result.data);
+    emit("customer-created");
+    emit("close");
   } catch (error) {
-    console.error("Error creating customer:", error);
-    // You might want to show this error to the user
+    console.error("Error creating customer:", err);
+    error.value = err.message || "Failed to create customer";
   } finally {
     isRegistering.value = false;
   }

@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useAuth } from "@/composables/useAuth";
 import { 
   getFirestore, 
@@ -52,7 +52,8 @@ import {
   getDocs,
   updateDoc,
   doc,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot
 } from "firebase/firestore";
 import ClientDocumentList from '@/components/client/ClientDocumentList.vue';
 import FormModal from '@/components/client/FormModal.vue';
@@ -65,6 +66,8 @@ const forms = ref([]);
 const selectedForm = ref(null);
 const isReadonly = ref(false);
 const isLoading = ref(false);
+
+let unsubscribeForms = null;
 
 // Computed
 const pendingDocuments = computed(() => 
@@ -87,6 +90,42 @@ const statusMapper = (status) => {
 };
 
 // Methods
+const setupRealtimeListener = async () => {
+  try {
+    isLoading.value = true;
+    
+    if (unsubscribeForms) unsubscribeForms();
+    
+    if (!user.value?.uid) return;
+    
+    unsubscribeForms = onSnapshot(
+      query(
+        collection(db, "forms"),
+        where("customerId", "==", user.value.uid)
+      ),
+      (snapshot) => {
+        forms.value = snapshot.docs.map(doc => ({
+          id: doc.id,
+          name: doc.data().templateName || "Documento",
+          createdAt: doc.data().createdAt,
+          updatedAt: doc.data().updatedAt,
+          status: doc.data().status,
+          templateId: doc.data().templateId,
+          ...doc.data()
+        }));
+        isLoading.value = false;
+      },
+      (error) => {
+        console.error("Failed to listen to forms:", error);
+        isLoading.value = false;
+      }
+    );
+  } catch (error) {
+    console.error("Error setting up realtime listener:", error);
+    isLoading.value = false;
+  }
+};
+
 const fetchForms = async () => {
   try {
     isLoading.value = true;
@@ -163,6 +202,22 @@ const handleFormSave = async (formData) => {
     console.error("Error saving draft:", error);
   }
 };
+
+// Lifecycle
+onMounted(async () => {
+  await setupRealtimeListener();
+});
+
+onUnmounted(() => {
+  if (unsubscribeForms) unsubscribeForms();
+});
+
+// Watch for user changes
+watch(user, (newUser) => {
+  if (newUser) {
+    setupRealtimeListener();
+  }
+}, { immediate: true });
 </script>
 
 <style scoped>

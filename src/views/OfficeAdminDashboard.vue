@@ -163,7 +163,7 @@
     <customer-modal
       v-if="showCustomerModal"
       @close="showCustomerModal = false"
-      @customer-created="refreshCustomers"
+      @customer-created="handleCustomerCreated"
     />
 
     <template-assignment-modal
@@ -243,6 +243,12 @@ const filteredCustomers = computed(() => {
 });
 
 // Methods
+const handleCustomerCreated = async () => {
+  await fetchCustomers();
+  successMessage.value = "Cliente criado com sucesso!";
+  setTimeout(() => successMessage.value = "", 3000);
+};
+
 const fetchCustomers = async () => {
   const q = query(collection(db, "users"), where("role", "==", "customer"));
   const snapshot = await getDocs(q);
@@ -489,10 +495,6 @@ const validateFieldLength = (event: Event, field: string, maxLength: number) => 
       }
     }
   }
-};
-
-const refreshCustomers = async () => {
-  await fetchCustomers();
 };
 
 // Lifecycle
