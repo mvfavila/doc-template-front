@@ -137,12 +137,13 @@
               <select v-model="placeholder.type">
                 <option value="long_text">Texto Longo (até 1000 caracteres)</option>
                 <option value="short_text">Texto Curto (até 100 caracteres)</option>
-                <option value="name">Nome (somente letras)</option>
+                <option value="name">Nome</option>
                 <option value="number">Número (somente números)</option>
-                <option value="cpf">CPF</option>
-                <option value="cnpj">CNPJ</option>
+                <option value="process_number">Número de Processo (#######-##.####.#.##.####)</option>
+                <option value="cpf">CPF (###.###.###-##)</option>
+                <option value="cnpj">CNPJ (##.###.###/####-##)</option>
                 <option value="email">E-mail</option>
-                <option value="phone">Telefone</option>
+                <option value="phone">Telefone (##) #####-####</option>
               </select>
             </div>
             <div class="config-row checkbox-row">

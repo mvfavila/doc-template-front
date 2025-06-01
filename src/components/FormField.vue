@@ -102,6 +102,18 @@
         @blur="handleBlur"
       />
 
+      <!-- Process Number Input -->
+      <input
+        v-else-if="placeholder.type === 'process_number'"
+        :id="fieldKey"
+        v-model="fieldData.value"
+        type="process_number"
+        :required="placeholder.required"
+        v-mask="['#######-##.####.#.##.####']"
+        @input="handleInput"
+        @blur="handleBlur"
+      />
+
       <div v-if="fieldData.comment" class="field-comment">
         <strong>Comentário:</strong> {{ fieldData.comment }}
       </div>
@@ -152,7 +164,7 @@
 
   // Computed properties
   const isSpecialType = computed(() => 
-    ['email', 'phone', 'cpf', 'cnpj', 'long_text', 'number', 'name'].includes(props.placeholder.type)
+    ['email', 'phone', 'cpf', 'cnpj', 'long_text', 'number', 'name', 'process_number'].includes(props.placeholder.type)
   );
 
   const inputType = computed(() => {
@@ -163,6 +175,7 @@
       case 'cpf': return 'cpf';
       case 'cnpj': return 'cnpj';
       case 'number': return 'number';
+      case 'process_number': return 'process_number';
       default: return 'text';
     }
   });
@@ -171,6 +184,10 @@
     switch(props.placeholder.type) {
       case 'short_text': return 100;
       case 'long_text': return 1000;
+      case 'cpf': return 11;
+      case 'cnpj': return 14;
+      case 'name': return 100;
+      case 'process_number': return 20;
       default: return null;
     }
   });
@@ -240,7 +257,7 @@
     }
 
     if (props.placeholder.type === 'name') {
-      const name = /^(?!\s)(?!.*\s{2})[\p{L}\p{M}\s'-]{2,50}(?<!\s)$/u;
+      const name = /^(?!\s)(?!.*\s{2})[\p{L}\p{M}\s'-]{2,100}(?<!\s)$/u;
       if (!name.test(value)) {
         error.value = 'Por favor insira um nome válido (apenas letras, espaços e hífens/apóstrofos)';
         emit('validation', false);
@@ -249,6 +266,15 @@
 
       if (value.length < 2 || value.length > 100) {
         error.value = 'O nome deve ter entre 2 e 100 caracteres';
+        emit('validation', false);
+        return;
+      }
+    }
+
+    if (props.placeholder.type === 'process_number') {
+      const digits = value.replace(/\D/g, '');
+      if (!/^(\d{20})$/.test(digits)) {
+        error.value = 'Por favor insira um Número de Processo válido (#######-##.####.#.##.####)';
         emit('validation', false);
         return;
       }
