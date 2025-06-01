@@ -91,6 +91,17 @@
         @blur="handleBlur"
       />
 
+      <!-- Name Input -->
+      <input
+        v-else-if="placeholder.type === 'name'"
+        :id="fieldKey"
+        v-model="fieldData.value"
+        type="name"
+        :required="placeholder.required"
+        @input="handleInput"
+        @blur="handleBlur"
+      />
+
       <div v-if="fieldData.comment" class="field-comment">
         <strong>Comentário:</strong> {{ fieldData.comment }}
       </div>
@@ -141,7 +152,7 @@
 
   // Computed properties
   const isSpecialType = computed(() => 
-    ['email', 'phone', 'cpf', 'cnpj', 'long_text', 'number'].includes(props.placeholder.type)
+    ['email', 'phone', 'cpf', 'cnpj', 'long_text', 'number', 'name'].includes(props.placeholder.type)
   );
 
   const inputType = computed(() => {
@@ -223,6 +234,21 @@
       const emailRegex = /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
       if (!emailRegex.test(value)) {
         error.value = 'Por favor insira um email válido (exemplo@dominio.com)';
+        emit('validation', false);
+        return;
+      }
+    }
+
+    if (props.placeholder.type === 'name') {
+      const name = /^(?!\s)(?!.*\s{2})[\p{L}\p{M}\s'-]{2,50}(?<!\s)$/u;
+      if (!name.test(value)) {
+        error.value = 'Por favor insira um nome válido (apenas letras, espaços e hífens/apóstrofos)';
+        emit('validation', false);
+        return;
+      }
+
+      if (value.length < 2 || value.length > 100) {
+        error.value = 'O nome deve ter entre 2 e 100 caracteres';
         emit('validation', false);
         return;
       }
