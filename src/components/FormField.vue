@@ -51,6 +51,7 @@
         v-model="fieldData.value"
         type="tel"
         :required="placeholder.required"
+        v-mask="['(##) ####-####', '(##) #####-####']"
         @input="handleInput"
         @blur="handleBlur"
       />
@@ -88,7 +89,8 @@
   
 <script setup lang="ts">
   import { ref, computed, watch } from 'vue';
-  
+  import { mask as vMask } from 'vue-the-mask';
+
   const props = defineProps({
     fieldKey: {
       type: String,
@@ -192,6 +194,16 @@
       error.value = 'Por favor insira um CNPJ válido (00.000.000/0000-00)';
       emit('validation', false);
       return;
+    }
+
+    if (props.placeholder.type === 'phone') {
+      const digits = value.replace(/\D/g, '');
+      // Validates exactly 10 digits (landline) or 11 digits (mobile)
+      if (!/^(\d{10}|\d{11})$/.test(digits)) {
+        error.value = 'Por favor insira um telefone válido (00) 0000-0000 ou (00) 00000-0000';
+        emit('validation', false);
+        return;
+      }
     }
 
     error.value = '';
