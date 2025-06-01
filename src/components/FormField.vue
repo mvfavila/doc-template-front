@@ -114,6 +114,16 @@
         @blur="handleBlur"
       />
 
+      <input
+        v-else-if="placeholder.type === 'date'"
+        :id="fieldKey"
+        v-model="fieldData.value"
+        type="date"
+        :required="placeholder.required"
+        @input="handleInput"
+        @blur="handleBlur"
+      />
+
       <div v-if="fieldData.comment" class="field-comment">
         <strong>Comentário:</strong> {{ fieldData.comment }}
       </div>
@@ -176,6 +186,7 @@
       case 'cnpj': return 'cnpj';
       case 'number': return 'number';
       case 'process_number': return 'process_number';
+      case 'date': return 'date';
       default: return 'text';
     }
   });
@@ -222,7 +233,7 @@
     if (props.placeholder.type === 'cpf') {
       const digits = value.replace(/\D/g, '');
       if (!/^(\d{11})$/.test(digits)) {
-        error.value = 'Por favor insira um CNPJ válido (00.000.000/0000-00)';
+        error.value = 'Por favor insira um CPF válido (000.000.000-00)';
         emit('validation', false);
         return;
       }
@@ -274,7 +285,7 @@
     if (props.placeholder.type === 'process_number') {
       const digits = value.replace(/\D/g, '');
       if (!/^(\d{20})$/.test(digits)) {
-        error.value = 'Por favor insira um Número de Processo válido (#######-##.####.#.##.####)';
+        error.value = 'Por favor insira um Número de Processo válido (0000000-00.0000.0.00.0000)';
         emit('validation', false);
         return;
       }
