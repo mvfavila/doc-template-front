@@ -177,13 +177,6 @@
       return;
     }
 
-    // Type-specific validation
-    if (props.placeholder.type === 'email' && !/^\S+@\S+\.\S+$/.test(value)) {
-      error.value = 'Por favor insira um email válido';
-      emit('validation', false);
-      return;
-    }
-
     if (props.placeholder.type === 'cpf' && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(value)) {
       error.value = 'Por favor insira um CPF válido (000.000.000-00)';
       emit('validation', false);
@@ -201,6 +194,15 @@
       // Validates exactly 10 digits (landline) or 11 digits (mobile)
       if (!/^(\d{10}|\d{11})$/.test(digits)) {
         error.value = 'Por favor insira um telefone válido (00) 0000-0000 ou (00) 00000-0000';
+        emit('validation', false);
+        return;
+      }
+    }
+
+    if (props.placeholder.type === 'email') {
+      const emailRegex = /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
+      if (!emailRegex.test(value)) {
+        error.value = 'Por favor insira um email válido (exemplo@dominio.com)';
         emit('validation', false);
         return;
       }
