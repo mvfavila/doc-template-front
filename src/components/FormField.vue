@@ -80,6 +80,17 @@
         @blur="handleBlur"
       />
 
+      <!-- Number Input -->
+      <input
+        v-else-if="placeholder.type === 'number'"
+        :id="fieldKey"
+        v-model="fieldData.value"
+        type="number"
+        :required="placeholder.required"
+        @input="handleInput"
+        @blur="handleBlur"
+      />
+
       <div v-if="fieldData.comment" class="field-comment">
         <strong>Comentário:</strong> {{ fieldData.comment }}
       </div>
@@ -130,7 +141,7 @@
 
   // Computed properties
   const isSpecialType = computed(() => 
-    ['email', 'phone', 'cpf', 'cnpj', 'long_text'].includes(props.placeholder.type)
+    ['email', 'phone', 'cpf', 'cnpj', 'long_text', 'number'].includes(props.placeholder.type)
   );
 
   const inputType = computed(() => {
@@ -140,6 +151,7 @@
       case 'name': return 'text';
       case 'cpf': return 'cpf';
       case 'cnpj': return 'cnpj';
+      case 'number': return 'number';
       default: return 'text';
     }
   });
