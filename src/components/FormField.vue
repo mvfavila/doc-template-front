@@ -63,6 +63,7 @@
         v-model="fieldData.value"
         type="cpf"
         :required="placeholder.required"
+        v-mask="['###.###.###-##']"
         @input="handleInput"
         @blur="handleBlur"
       />
@@ -74,6 +75,7 @@
         v-model="fieldData.value"
         type="cnpj"
         :required="placeholder.required"
+        v-mask="['##.###.###/####-##']"
         @input="handleInput"
         @blur="handleBlur"
       />
@@ -177,16 +179,22 @@
       return;
     }
 
-    if (props.placeholder.type === 'cpf' && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(value)) {
-      error.value = 'Por favor insira um CPF válido (000.000.000-00)';
-      emit('validation', false);
-      return;
+    if (props.placeholder.type === 'cpf') {
+      const digits = value.replace(/\D/g, '');
+      if (!/^(\d{11})$/.test(digits)) {
+        error.value = 'Por favor insira um CNPJ válido (00.000.000/0000-00)';
+        emit('validation', false);
+        return;
+      }
     }
 
-    if (props.placeholder.type === 'cnpj' && !/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(value)) {
-      error.value = 'Por favor insira um CNPJ válido (00.000.000/0000-00)';
-      emit('validation', false);
-      return;
+    if (props.placeholder.type === 'cnpj') {
+      const digits = value.replace(/\D/g, '');
+      if (!/^(\d{14})$/.test(digits)) {
+        error.value = 'Por favor insira um CNPJ válido (00.000.000/0000-00)';
+        emit('validation', false);
+        return;
+      }
     }
 
     if (props.placeholder.type === 'phone') {
