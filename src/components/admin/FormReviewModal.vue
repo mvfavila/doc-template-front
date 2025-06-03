@@ -1,7 +1,10 @@
 <template>
   <div class="modal-overlay">
     <div class="modal-content">
-      <h2>Revisar {{ templateName }}</h2>
+      <div class="modal-header">
+        <h2>Revisar {{ templateName }}</h2>
+        <button class="close-button" @click="$emit('close')">×</button>
+      </div>
       
       <form @submit.prevent="submitForm">
         <div v-for="(placeholder, key) in templatePlaceholders" :key="key" class="compact-field">
@@ -523,5 +526,28 @@ button {
 .field-details.show-comment textarea {
   border-color: #f39c12;
   background-color: #fffaf5;
+}
+
+.modal-header {
+  position: relative;
+  padding-right: 2rem;
+}
+
+.close-button {
+  position: absolute;
+  top: -0.5rem;
+  right: -0.5rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  line-height: 1;
+  color: #666;
+  transition: color 0.2s;
+}
+
+.close-button:hover {
+  color: #333;
 }
 </style>
