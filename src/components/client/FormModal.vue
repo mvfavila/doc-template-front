@@ -1,5 +1,5 @@
 <template>
-  <div class="modal-overlay" v-if="form">
+  <div class="modal-overlay" v-if="form" @keydown.esc="handleEscKey">
     <div class="modal-content">
       <div class="modal-header">
         <h2>{{ form.name }}</h2>
@@ -52,7 +52,7 @@
 </template>
   
 <script setup>
-  import { ref, computed, watch, onMounted, nextTick } from "vue";
+  import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
   import { doc, getDoc } from "@firebase/firestore";
   import { db } from "@/firebase";
   import FormField from "@/components/FormField.vue";
@@ -210,6 +210,12 @@
     if (props.templateId) {
       await loadTemplate(props.templateId);
     }
+
+    window.addEventListener('keydown', handleEscKey);
+  });
+
+  onUnmounted(() => {
+    window.removeEventListener('keydown', handleEscKey);
   });
 
   // Watch for templateId changes
@@ -218,6 +224,12 @@
       await loadTemplate(newTemplateId);
     }
   });
+
+  const handleEscKey = (event) => {
+    if (event.key === 'Escape') {
+      emit('close');
+    }
+  };
   
   const updateValidation = (fieldKey, isValid) => {
     fieldValidations.value[fieldKey] = isValid;

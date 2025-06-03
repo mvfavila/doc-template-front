@@ -51,6 +51,7 @@
         v-model="fieldData.value"
         type="tel"
         :required="placeholder.required"
+        v-mask="['(##) ####-####', '(##) #####-####']"
         @input="handleInput"
         @blur="handleBlur"
       />
@@ -62,6 +63,7 @@
         v-model="fieldData.value"
         type="cpf"
         :required="placeholder.required"
+        v-mask="['###.###.###-##']"
         @input="handleInput"
         @blur="handleBlur"
       />
@@ -72,6 +74,51 @@
         :id="fieldKey"
         v-model="fieldData.value"
         type="cnpj"
+        :required="placeholder.required"
+        v-mask="['##.###.###/####-##']"
+        @input="handleInput"
+        @blur="handleBlur"
+      />
+
+      <!-- Number Input -->
+      <input
+        v-else-if="placeholder.type === 'number'"
+        :id="fieldKey"
+        v-model="fieldData.value"
+        type="number"
+        :required="placeholder.required"
+        @input="handleInput"
+        @blur="handleBlur"
+      />
+
+      <!-- Name Input -->
+      <input
+        v-else-if="placeholder.type === 'name'"
+        :id="fieldKey"
+        v-model="fieldData.value"
+        type="name"
+        :required="placeholder.required"
+        @input="handleInput"
+        @blur="handleBlur"
+      />
+
+      <!-- Process Number Input -->
+      <input
+        v-else-if="placeholder.type === 'process_number'"
+        :id="fieldKey"
+        v-model="fieldData.value"
+        type="process_number"
+        :required="placeholder.required"
+        v-mask="['#######-##.####.#.##.####']"
+        @input="handleInput"
+        @blur="handleBlur"
+      />
+
+      <input
+        v-else-if="placeholder.type === 'date'"
+        :id="fieldKey"
+        v-model="fieldData.value"
+        type="date"
         :required="placeholder.required"
         @input="handleInput"
         @blur="handleBlur"
@@ -88,7 +135,8 @@
   
 <script setup lang="ts">
   import { ref, computed, watch } from 'vue';
-  
+  import { mask as vMask } from 'vue-the-mask';
+
   const props = defineProps({
     fieldKey: {
       type: String,
@@ -126,7 +174,7 @@
 
   // Computed properties
   const isSpecialType = computed(() => 
-    ['email', 'phone', 'cpf', 'cnpj', 'long_text'].includes(props.placeholder.type)
+    ['email', 'phone', 'cpf', 'cnpj', 'long_text', 'number', 'name', 'process_number'].includes(props.placeholder.type)
   );
 
   const inputType = computed(() => {
@@ -136,6 +184,9 @@
       case 'name': return 'text';
       case 'cpf': return 'cpf';
       case 'cnpj': return 'cnpj';
+      case 'number': return 'number';
+      case 'process_number': return 'process_number';
+      case 'date': return 'date';
       default: return 'text';
     }
   });
@@ -144,6 +195,10 @@
     switch(props.placeholder.type) {
       case 'short_text': return 100;
       case 'long_text': return 1000;
+      case 'cpf': return 11;
+      case 'cnpj': return 14;
+      case 'name': return 100;
+      case 'process_number': return 20;
       default: return null;
     }
   });
@@ -175,23 +230,65 @@
       return;
     }
 
-    // Type-specific validation
-    if (props.placeholder.type === 'email' && !/^\S+@\S+\.\S+$/.test(value)) {
-      error.value = 'Por favor insira um email válido';
-      emit('validation', false);
-      return;
+    if (props.placeholder.type === 'cpf') {
+      const digits = value.replace(/\D/g, '');
+      if (!/^(\d{11})$/.test(digits)) {
+        error.value = 'Por favor insira um CPF válido (000.000.000-00)';
+        emit('validation', false);
+        return;
+      }
     }
 
-    if (props.placeholder.type === 'cpf' && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(value)) {
-      error.value = 'Por favor insira um CPF válido (000.000.000-00)';
-      emit('validation', false);
-      return;
+    if (props.placeholder.type === 'cnpj') {
+      const digits = value.replace(/\D/g, '');
+      if (!/^(\d{14})$/.test(digits)) {
+        error.value = 'Por favor insira um CNPJ válido (00.000.000/0000-00)';
+        emit('validation', false);
+        return;
+      }
     }
 
-    if (props.placeholder.type === 'cnpj' && !/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(value)) {
-      error.value = 'Por favor insira um CNPJ válido (00.000.000/0000-00)';
-      emit('validation', false);
-      return;
+    if (props.placeholder.type === 'phone') {
+      const digits = value.replace(/\D/g, '');
+      // Validates exactly 10 digits (landline) or 11 digits (mobile)
+      if (!/^(\d{10}|\d{11})$/.test(digits)) {
+        error.value = 'Por favor insira um telefone válido (00) 0000-0000 ou (00) 00000-0000';
+        emit('validation', false);
+        return;
+      }
+    }
+
+    if (props.placeholder.type === 'email') {
+      const emailRegex = /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
+      if (!emailRegex.test(value)) {
+        error.value = 'Por favor insira um email válido (exemplo@dominio.com)';
+        emit('validation', false);
+        return;
+      }
+    }
+
+    if (props.placeholder.type === 'name') {
+      const name = /^(?!\s)(?!.*\s{2})[\p{L}\p{M}\s'-]{2,100}(?<!\s)$/u;
+      if (!name.test(value)) {
+        error.value = 'Por favor insira um nome válido (apenas letras, espaços e hífens/apóstrofos)';
+        emit('validation', false);
+        return;
+      }
+
+      if (value.length < 2 || value.length > 100) {
+        error.value = 'O nome deve ter entre 2 e 100 caracteres';
+        emit('validation', false);
+        return;
+      }
+    }
+
+    if (props.placeholder.type === 'process_number') {
+      const digits = value.replace(/\D/g, '');
+      if (!/^(\d{20})$/.test(digits)) {
+        error.value = 'Por favor insira um Número de Processo válido (0000000-00.0000.0.00.0000)';
+        emit('validation', false);
+        return;
+      }
     }
 
     error.value = '';
