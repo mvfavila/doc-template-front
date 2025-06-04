@@ -118,9 +118,17 @@
                   >
                     DOCX
                   </button>
-                  <span v-if="!doc.generatedPdfUrl || !doc.generatedDocxUrl" class="error-badge">
-                    !
-                  </span>
+                  <template v-if="!doc.generatedPdfUrl || !doc.generatedDocxUrl">
+                    <span class="error-badge">
+                      !
+                    </span>
+                    <button 
+                      @click="regenerateDocument(doc.id)"
+                      class="action-button regenerate-button"
+                    >
+                      Tentar novamente
+                    </button>
+                  </template>
                 </td>
               </tr>
             </tbody>
@@ -157,6 +165,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getAuth } from "firebase/auth";
 import { 
+  addDoc,
   getFirestore, 
   collection, 
   query, 
@@ -506,6 +515,19 @@ const handleDocumentSubmit = async (formData) => {
   }
 }
 
+const regenerateDocument = async (documentId) => {
+  try {
+    await addDoc(collection(db, 'document_jobs'), {
+      formId: documentId,
+      createdAt: serverTimestamp()
+    });
+    
+    console.log('Document regeneration triggered');
+  } catch (error) {
+    console.error('Error triggering regeneration:', error);
+  }
+};
+
 const resetFilters = () => {
   completedFilter.value = {
     customerId: '',
@@ -746,6 +768,15 @@ onUnmounted(() => {
 
 .error-message button:hover {
   background-color: #c0392b;
+}
+
+.regenerate-button {
+  background-color: #f39c12;
+  margin-left: 0.5rem;
+}
+
+.regenerate-button:hover {
+  background-color: #e67e22;
 }
 
 @media (max-width: 768px) {
