@@ -10,7 +10,7 @@ Calls the Cloud Run service to process the form which ID is in the job document.
 ### Requirements
 
 Prior to deployment, it requires a `.env` file in the same directory as the `main.py` file which holds the function.
-The `.env` file must define the `DOCGEN_URL` environment variable.
+The `functions/python/.env` file must define the `DOCGEN_URL` environment variable.
 
 Format:
 

@@ -104,7 +104,6 @@ def process_document_job(event: firestore_fn.Event[firestore_fn.DocumentSnapshot
         return
 
     try:
-        # Get the document data
         doc_data = snapshot.to_dict()
         form_id = doc_data.get("formId")
         
@@ -116,13 +115,17 @@ def process_document_job(event: firestore_fn.Event[firestore_fn.DocumentSnapshot
         if not cloud_run_url:
             raise ValueError("DOCGEN_URL not set in Firebase config")
         
+        # Ensure URL ends with / if not present
+        if not cloud_run_url.endswith('/'):
+            cloud_run_url += '/'
+        
         headers = {
             "Authorization": f"Bearer {get_cloud_run_token(cloud_run_url)}",
             "Content-Type": "application/json"
         }
         
         response = requests.post(
-            f"{cloud_run_url}/",
+            cloud_run_url,
             headers=headers,
             json={"formId": form_id},
             timeout=30
@@ -130,6 +133,7 @@ def process_document_job(event: firestore_fn.Event[firestore_fn.DocumentSnapshot
 
         if response.status_code != 200:
             print(f"Cloud Run request failed: {response.status_code} - {response.text}")
+            print(f"Response headers: {response.headers}")
         else:
             print(f"Successfully processed form {form_id}")
 
