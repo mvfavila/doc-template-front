@@ -43,6 +43,9 @@ def handle_firestore_event():
 
         # Fetch form data and template
         form_data = firestore_utils.fetch_form_data(form_id)
+        if not form_data:
+            raise ValueError(f"Form {form_id} not found")
+            
         template_path = firestore_utils.download_template(form_data)
         
         # Process document

@@ -104,7 +104,7 @@
                 <td>{{ doc.templateName || 'Documento' }}</td>
                 <td>{{ formatDate(doc.createdAt) }}</td>
                 <td class="actions">
-                  <template v-if="documentStatus(doc.id) === 'pending' || documentStatus(doc.id) === 'processing'">
+                  <template v-if="documentStatus(doc.id) === 'pickedup' || documentStatus(doc.id) === 'pending' || documentStatus(doc.id) === 'processing'">
                     <span class="generating-badge">
                       Processando...
                     </span>
@@ -136,7 +136,7 @@
                     >
                       DOCX
                     </button>
-                    <template v-if="(!doc.generatedPdfUrl || !doc.generatedDocxUrl)">
+                    <template v-if="documentStatus(doc.id) === 'failed'">
                       <button 
                         @click="regenerateDocument(doc.id)"
                         class="action-button regenerate-button"
@@ -452,13 +452,6 @@ const filteredCompletedDocuments = computed(() => {
   return filtered
 })
 
-const isRecentlyGenerated = computed(() => (docId) => {
-  const generationTime = pendingGenerations.value[docId];
-  if (!generationTime) return false;
-  
-  return Date.now() - generationTime < 2 * 60 * 1000;
-});
-
 const documentStatus = computed(() => (docId) => {
   const job = documentJobs.value[docId];
   if (!job) return null;
@@ -467,7 +460,7 @@ const documentStatus = computed(() => (docId) => {
   const isRecent = job.updatedAt && 
     Date.now() - job.updatedAt.toDate().getTime() < 2 * 60 * 1000;
   
-  return isRecent ? job.status : null;
+  return isRecent ? job.status : 'failed';
 });
 
 // Methods
