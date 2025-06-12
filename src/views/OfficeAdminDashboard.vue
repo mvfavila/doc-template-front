@@ -139,11 +139,12 @@
                 <option value="short_text">Texto Curto (até 100 caracteres)</option>
                 <option value="name">Nome</option>
                 <option value="number">Número (somente números)</option>
-                <option value="process_number">Número de Processo (0000000-00.0000.0.00.0000)</option>
-                <option value="cpf">CPF (000.000.000-00)</option>
-                <option value="cnpj">CNPJ (00.000.000/0000-00)</option>
+                <option value="process_number">Número de Processo 0000000-00.0000.0.00.0000</option>
+                <option value="cpf">CPF 000.000.000-00</option>
+                <option value="cnpj">CNPJ 00.000.000/0000-00</option>
                 <option value="email">E-mail</option>
                 <option value="phone">Telefone (00) 00000-0000</option>
+                <option value="date">Data 00/00/0000</option>
               </select>
             </div>
             <div class="config-row checkbox-row">

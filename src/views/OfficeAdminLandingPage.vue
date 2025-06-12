@@ -104,23 +104,14 @@
                 <td>{{ doc.templateName || 'Documento' }}</td>
                 <td>{{ formatDate(doc.createdAt) }}</td>
                 <td class="actions">
-                  <button 
-                    @click="downloadFile(doc.generatedPdfUrl, `${getCustomerName(doc.customerId)}_${doc.templateName || 'documento'}.pdf`)"
-                    :disabled="!doc.generatedPdfUrl"
-                    class="action-button"
-                  >
-                    PDF
-                  </button>
-                  <button 
-                    @click="downloadFile(doc.generatedDocxUrl, `${getCustomerName(doc.customerId)}_${doc.templateName || 'documento'}.docx`)"
-                    :disabled="!doc.generatedDocxUrl"
-                    class="action-button"
-                  >
-                    DOCX
-                  </button>
-                  <template v-if="!doc.generatedPdfUrl || !doc.generatedDocxUrl">
+                  <template v-if="documentStatus(doc.id) === 'pending' || documentStatus(doc.id) === 'processing'">
+                    <span class="generating-badge">
+                      Processando...
+                    </span>
+                  </template>
+                  <template v-else-if="documentStatus(doc.id) === 'failed'">
                     <span class="error-badge">
-                      !
+                      Falha na geração
                     </span>
                     <button 
                       @click="regenerateDocument(doc.id)"
@@ -128,6 +119,31 @@
                     >
                       Tentar novamente
                     </button>
+                  </template>
+
+                  <template v-else>
+                    <button 
+                      @click="downloadFile(doc.generatedPdfUrl, `${getCustomerName(doc.customerId)}_${doc.templateName || 'documento'}.pdf`)"
+                      :disabled="!doc.generatedPdfUrl"
+                      class="action-button"
+                    >
+                      PDF
+                    </button>
+                    <button 
+                      @click="downloadFile(doc.generatedDocxUrl, `${getCustomerName(doc.customerId)}_${doc.templateName || 'documento'}.docx`)"
+                      :disabled="!doc.generatedDocxUrl"
+                      class="action-button"
+                    >
+                      DOCX
+                    </button>
+                    <template v-if="(!doc.generatedPdfUrl || !doc.generatedDocxUrl)">
+                      <button 
+                        @click="regenerateDocument(doc.id)"
+                        class="action-button regenerate-button"
+                      >
+                        Tentar novamente
+                      </button>
+                    </template>
                   </template>
                 </td>
               </tr>
@@ -154,6 +170,7 @@
 
     <form-review-modal
       v-if="activeDocument && (activeDocument.status === 'submitted')"
+      :key="activeDocument.id"
       :form="activeDocument"
       @close="activeDocument = null"
       @saved="handleFormSaved"
@@ -187,6 +204,8 @@ const storage = getStorage();
 
 // Data
 const documents = ref([])
+const documentJobs = ref({});
+const pendingGenerations = ref({});
 const customers = ref([])
 const templates = ref([])
 const activeDocument = ref(null)
@@ -218,6 +237,7 @@ const completedFilter = ref({
 let unsubscribeDocuments = null;
 let unsubscribeCustomers = null;
 let unsubscribeTemplates = null;
+let unsubscribeDocumentJobs = null;
 
 const setupRealtimeListeners = async () => {
   try {
@@ -293,6 +313,17 @@ const setupRealtimeListeners = async () => {
         loadingStates.value.pending = false;
         loadingStates.value.review = false;
         loadingStates.value.completed = false;
+      }
+    );
+
+    unsubscribeDocumentJobs = onSnapshot(
+      query(collection(db, 'document_jobs')),
+      (snapshot) => {
+        const jobs = {};
+        snapshot.docs.forEach(doc => {
+          jobs[doc.id] = doc.data();
+        });
+        documentJobs.value = jobs;
       }
     );
     
@@ -421,17 +452,38 @@ const filteredCompletedDocuments = computed(() => {
   return filtered
 })
 
+const isRecentlyGenerated = computed(() => (docId) => {
+  const generationTime = pendingGenerations.value[docId];
+  if (!generationTime) return false;
+  
+  return Date.now() - generationTime < 2 * 60 * 1000;
+});
+
+const documentStatus = computed(() => (docId) => {
+  const job = documentJobs.value[docId];
+  if (!job) return null;
+  
+  // Consider job active if updated in last 2 minutes
+  const isRecent = job.updatedAt && 
+    Date.now() - job.updatedAt.toDate().getTime() < 2 * 60 * 1000;
+  
+  return isRecent ? job.status : null;
+});
+
 // Methods
 const retryLoading = async () => {
   // Clear all listeners
   if (unsubscribeDocuments) unsubscribeDocuments();
   if (unsubscribeCustomers) unsubscribeCustomers();
   if (unsubscribeTemplates) unsubscribeTemplates();
+  if (unsubscribeDocumentJobs) unsubscribeDocumentJobs();
   
   // Reset states
   documents.value = [];
   customers.value = [];
   templates.value = [];
+  documentJobs.value = {};
+  pendingGenerations.value = {};
   
   // Restart listeners
   await setupRealtimeListeners();
@@ -517,12 +569,16 @@ const handleDocumentSubmit = async (formData) => {
 
 const regenerateDocument = async (documentId) => {
   try {
+    // Clear any existing job status
+    const newJobs = {...documentJobs.value};
+    delete newJobs[documentId];
+    documentJobs.value = newJobs;
+    
+    // Trigger regeneration
     await addDoc(collection(db, 'document_jobs'), {
       formId: documentId,
       createdAt: serverTimestamp()
     });
-    
-    console.log('Document regeneration triggered');
   } catch (error) {
     console.error('Error triggering regeneration:', error);
   }
@@ -572,6 +628,7 @@ onUnmounted(() => {
   if (unsubscribeDocuments) unsubscribeDocuments();
   if (unsubscribeCustomers) unsubscribeCustomers();
   if (unsubscribeTemplates) unsubscribeTemplates();
+  if (unsubscribeDocumentJobs) unsubscribeDocumentJobs();
 });
 </script>
 
@@ -707,6 +764,7 @@ onUnmounted(() => {
   margin-left: 5px;
   cursor: help;
   position: relative;
+  margin-left: 0.5rem;
 }
 
 .error-badge:hover::after {
@@ -777,6 +835,25 @@ onUnmounted(() => {
 
 .regenerate-button:hover {
   background-color: #e67e22;
+}
+
+.generating-badge {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  background-color: #f8f4e5;
+  color: #8a6d3b;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+/* Animation for generating state */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.generating-badge {
+  animation: pulse 2s infinite;
 }
 
 @media (max-width: 768px) {

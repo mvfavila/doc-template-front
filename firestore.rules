@@ -51,8 +51,7 @@ service cloud.firestore {
     }
     
     match /document_jobs/{jobId} {
-      allow create: if isOfficeAdmin();
-      allow read: if false;
+      allow create, read: if isOfficeAdmin();
     }
     
     match /admins/{uid} {

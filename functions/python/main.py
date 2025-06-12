@@ -1,23 +1,31 @@
-from firebase_functions import firestore_fn
-from firebase_admin import initialize_app, storage
+from firebase_functions import firestore_fn, logger, params
+import firebase_admin
+from firebase_admin import initialize_app, storage, credentials
 from google.auth.transport.requests import Request
 from google.oauth2 import id_token
-import google.cloud.firestore
 import tempfile
 import os
 from docx import Document
 import re
-import sys
-from pathlib import Path
 import requests
+from datetime import datetime, timezone
+import json
 
-
-# Add lib directory to Python path
-lib_path = str(Path(__file__).parent.parent / 'lib')
-if lib_path not in sys.path:
-    sys.path.insert(0, lib_path)
-
-initialize_app()
+def initialize_firebase(app_name):
+    try:
+        service_account_json = os.environ.get("DOCGEN_SA")
+        if not service_account_json:
+            print("❌ DOCGEN_SA not set in Firebase config!")
+            raise ValueError("❌ DOCGEN_SA not set in Firebase config!")
+        
+        service_account_info = json.loads(service_account_json)
+        cred = credentials.Certificate(service_account_info)
+        
+        return initialize_app(cred, name=app_name)
+    
+    except Exception as e:
+        print(f"🔥 Firebase init failed: {str(e)}")
+        raise
 
 # Triggered when a new template document is created
 @firestore_fn.on_document_created(document="templates/{templateId}")
@@ -102,22 +110,32 @@ def process_document_job(event: firestore_fn.Event[firestore_fn.DocumentSnapshot
     if not snapshot.exists:
         print("Document no longer exists")
         return
+    
+    app_name = 'process_document_job_app'
+    if firebase_admin._apps.get(app_name) is None:
+        initialize_firebase(app_name)
 
     try:
         doc_data = snapshot.to_dict()
+        job_id = event.params["docId"]
         form_id = doc_data.get("formId")
         
         if not form_id:
             print("No formId found in document")
             return
 
+        # Update job status to 'pickedup'
+        snapshot.reference.update({
+            "status": "pickedup",
+            "updatedAt": datetime.now(timezone.utc)
+        })
+
         cloud_run_url = os.environ.get("DOCGEN_URL")
         if not cloud_run_url:
             raise ValueError("DOCGEN_URL not set in Firebase config")
         
         # Ensure URL ends with / if not present
-        if not cloud_run_url.endswith('/'):
-            cloud_run_url += '/'
+        cloud_run_url = cloud_run_url.rstrip('/') + '/'
         
         headers = {
             "Authorization": f"Bearer {get_cloud_run_token(cloud_run_url)}",
@@ -127,25 +145,38 @@ def process_document_job(event: firestore_fn.Event[firestore_fn.DocumentSnapshot
         response = requests.post(
             cloud_run_url,
             headers=headers,
-            json={"formId": form_id},
+            json={
+                "jobId": job_id,
+                "formId": form_id
+            },
             timeout=30
         )
 
         if response.status_code != 200:
-            print(f"Cloud Run request failed: {response.status_code} - {response.text}")
-            print(f"Response headers: {response.headers}")
+            error_msg = f"Cloud Run request failed: {response.status_code} - {response.text}"
+            print(error_msg)
+            snapshot.reference.update({
+                "status": "failed",
+                "error": error_msg[:500],
+                "updatedAt": datetime.now(datetime.timezone.utc)
+            })
         else:
-            print(f"Successfully processed form {form_id}")
+            print(f"Successfully processed job {job_id} for form {form_id}")
 
     except Exception as error:
-        print(f"Error processing document job: {error}")
+        error_msg = f"Error processing document job: {error}"
+        print(error_msg)
+        if snapshot.exists:
+            snapshot.reference.update({
+                "status": "failed",
+                "error": str(error)[:500],
+                "updatedAt": datetime.now(datetime.timezone.utc)
+            })
         raise
 
 def get_cloud_run_token(target_audience):
     try:
-        audience = target_audience
-        token = id_token.fetch_id_token(Request(), audience)
-        return token
+        return id_token.fetch_id_token(Request(), target_audience)
     except Exception as e:
         print(f"Error getting ID token: {str(e)}")
         raise
