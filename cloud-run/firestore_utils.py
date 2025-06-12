@@ -179,3 +179,18 @@ def update_document_urls(form_id: str, pdf_path: str, docx_path: str) -> None:
     except Exception as e:
         logger.error(f"Error updating document URLs: {str(e)}", exc_info=True)
         raise
+
+def update_document_job(job_id: str, status: str, error: str = None) -> None:
+    """Update a document generation job record"""
+    try:
+        doc_ref = db.collection("document_jobs").document(job_id)
+        update_data = {
+            "status": status,
+            "updatedAt": firestore.SERVER_TIMESTAMP
+        }
+        if error:
+            update_data["error"] = error
+        doc_ref.update(update_data)
+    except Exception as e:
+        logger.error(f"Error updating document job: {str(e)}")
+        raise
