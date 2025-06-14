@@ -81,11 +81,10 @@
       // Create forms for all selected customers
       await Promise.all(
         selectedCustomers.value.map(customerId => 
-          addDoc(collection(db, 'forms'), {
+          addDoc(collection(db, 'customer_templates'), {
             templateId: props.template.id,
             templateName: templateData.name,
             customerId,
-            status: 'pending',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             officeId: props.template.officeId,

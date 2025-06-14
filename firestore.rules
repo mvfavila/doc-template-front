@@ -40,6 +40,13 @@ service cloud.firestore {
       allow read: if isOfficeAdmin() || isCustomer();
     }
     
+    match /customer_templates/{customerTemplateId} {
+      allow read: if isSpecificOfficeAdmin(resource.data.officeId) || 
+                    (isCustomer() && resource.data.customerId == request.auth.uid);
+      allow update: if isSpecificOfficeAdmin(resource.data.officeId);
+      allow create: if isOfficeAdmin();
+    }
+    
     match /forms/{formId} {
       allow read: if isSpecificOfficeAdmin(resource.data.officeId) || 
                     (isCustomer() && resource.data.customerId == request.auth.uid);
