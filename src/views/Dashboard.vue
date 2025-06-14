@@ -92,6 +92,7 @@ const isReadonly = ref(false);
 const isLoading = ref(false);
 
 let unsubscribeForms = null;
+let unsubscribeTemplates = null;
 
 // Computed
 const pendingDocuments = computed(() => 
@@ -116,11 +117,12 @@ const statusMapper = (status) => {
 };
 
 // Methods
-const setupRealtimeListener = async () => {
+const setupRealtimeListeners = async () => {
   try {
     isLoading.value = true;
     
     if (unsubscribeForms) unsubscribeForms();
+    if (unsubscribeTemplates) unsubscribeTemplates();
     
     if (!user.value?.uid) return;
     
@@ -146,8 +148,29 @@ const setupRealtimeListener = async () => {
         isLoading.value = false;
       }
     );
+    
+    unsubscribeTemplates = onSnapshot(
+      query(
+        collection(db, "customer_templates"),
+        where("customerId", "==", user.value.uid)
+      ),
+      (snapshot) => {
+        customerTemplates.value = snapshot.docs.map(doc => ({
+          id: doc.id,
+          templateName: doc.data().templateName,
+          createdAt: doc.data().createdAt?.toDate(),
+          templateId: doc.data().templateId,
+          officeId: doc.data().officeId,
+          ...doc.data()
+        }));
+      },
+      (error) => {
+        console.error("Failed to listen to templates:", error);
+      }
+    );
+    
   } catch (error) {
-    console.error("Error setting up realtime listener:", error);
+    console.error("Error setting up realtime listeners:", error);
     isLoading.value = false;
   }
 };
@@ -281,18 +304,18 @@ const handleFormSave = async (formData) => {
 
 // Lifecycle
 onMounted(async () => {
-  await setupRealtimeListener();
-  await fetchCustomerTemplates();
+  await setupRealtimeListeners();
 });
 
 onUnmounted(() => {
   if (unsubscribeForms) unsubscribeForms();
+  if (unsubscribeTemplates) unsubscribeTemplates();
 });
 
 // Watch for user changes
 watch(user, (newUser) => {
   if (newUser) {
-    setupRealtimeListener();
+    setupRealtimeListeners();
   }
 }, { immediate: true });
 </script>
