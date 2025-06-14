@@ -7,6 +7,28 @@
     </div>
 
     <div v-else>
+      <div class="customer-templates">
+        <h2>Modelos Disponíveis</h2>
+        <div class="template-grid">
+          <div 
+            v-for="template in customerTemplates" 
+            :key="template.id" 
+            class="template-card"
+          >
+            <div class="template-info">
+              <h3>{{ template.templateName }}</h3>
+            </div>
+            <button 
+              class="add-button"
+              @click="createFormFromTemplate(template)"
+              title="Criar novo documento"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+      
       <div class="pending-documents">
         <h2>Documentos Pendentes</h2>
         <client-document-list
@@ -45,6 +67,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useAuth } from "@/composables/useAuth";
 import { 
+  addDoc,
   getFirestore, 
   collection, 
   query, 
@@ -63,11 +86,13 @@ const { user } = useAuth();
 
 // State
 const forms = ref([]);
+const customerTemplates = ref([]);
 const selectedForm = ref(null);
 const isReadonly = ref(false);
 const isLoading = ref(false);
 
 let unsubscribeForms = null;
+let unsubscribeTemplates = null;
 
 // Computed
 const pendingDocuments = computed(() => 
@@ -82,6 +107,8 @@ const completedDocuments = computed(() =>
   )
 );
 
+const hasTemplates = computed(() => customerTemplates.value.length > 0);
+
 // Status mapper for completed documents
 const statusMapper = (status) => {
   if (status === 'submitted') return 'Em revisão';
@@ -90,11 +117,12 @@ const statusMapper = (status) => {
 };
 
 // Methods
-const setupRealtimeListener = async () => {
+const setupRealtimeListeners = async () => {
   try {
     isLoading.value = true;
     
     if (unsubscribeForms) unsubscribeForms();
+    if (unsubscribeTemplates) unsubscribeTemplates();
     
     if (!user.value?.uid) return;
     
@@ -120,8 +148,29 @@ const setupRealtimeListener = async () => {
         isLoading.value = false;
       }
     );
+    
+    unsubscribeTemplates = onSnapshot(
+      query(
+        collection(db, "customer_templates"),
+        where("customerId", "==", user.value.uid)
+      ),
+      (snapshot) => {
+        customerTemplates.value = snapshot.docs.map(doc => ({
+          id: doc.id,
+          templateName: doc.data().templateName,
+          createdAt: doc.data().createdAt?.toDate(),
+          templateId: doc.data().templateId,
+          officeId: doc.data().officeId,
+          ...doc.data()
+        }));
+      },
+      (error) => {
+        console.error("Failed to listen to templates:", error);
+      }
+    );
+    
   } catch (error) {
-    console.error("Error setting up realtime listener:", error);
+    console.error("Error setting up realtime listeners:", error);
     isLoading.value = false;
   }
 };
@@ -151,10 +200,60 @@ const fetchForms = async () => {
   }
 };
 
+const fetchCustomerTemplates = async () => {
+  try {
+    if (!user.value?.uid) return;
+    
+    const q = query(
+      collection(db, "customer_templates"),
+      where("customerId", "==", user.value.uid)
+    );
+    const snapshot = await getDocs(q);
+    
+    customerTemplates.value = snapshot.docs.map(doc => ({
+      id: doc.id,
+      templateName: doc.data().templateName,
+      createdAt: doc.data().createdAt?.toDate(),
+      templateId: doc.data().templateId,
+      officeId: doc.data().officeId,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error("Failed to fetch customer templates:", error);
+  }
+};
+
+const createFormFromTemplate = async (template) => {
+  try {
+    isLoading.value = true;
+    
+    const newForm = {
+      customerId: user.value.uid,
+      templateId: template.templateId,
+      templateName: template.templateName,
+      officeId: template.officeId,
+      status: "pending",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      formData: {}
+    };
+
+    await addDoc(collection(db, "forms"), newForm);
+    
+    // Refresh the forms list
+    await fetchForms();
+  } catch (error) {
+    console.error("Error creating form from template:", error);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 // Watch for user changes
 watch(user, (newUser) => {
   if (newUser) {
     fetchForms();
+    fetchCustomerTemplates();
   }
 }, { immediate: true });
 
@@ -205,17 +304,18 @@ const handleFormSave = async (formData) => {
 
 // Lifecycle
 onMounted(async () => {
-  await setupRealtimeListener();
+  await setupRealtimeListeners();
 });
 
 onUnmounted(() => {
   if (unsubscribeForms) unsubscribeForms();
+  if (unsubscribeTemplates) unsubscribeTemplates();
 });
 
 // Watch for user changes
 watch(user, (newUser) => {
   if (newUser) {
-    setupRealtimeListener();
+    setupRealtimeListeners();
   }
 }, { immediate: true });
 </script>
@@ -236,5 +336,53 @@ watch(user, (newUser) => {
     padding: 2rem;
     text-align: center;
     color: #666;
+  }
+
+  .customer-templates {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid #eee;
+    border-radius: 5px;
+  }
+
+  .template-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+  }
+
+  .template-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+  }
+
+  .template-info h3 {
+    margin: 0 0 5px 0;
+    font-size: 1rem;
+  }
+
+  .add-button {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s;
+  }
+
+  .add-button:hover {
+    background-color: #45a049;
   }
 </style>

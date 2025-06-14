@@ -2,7 +2,7 @@
   <div class="modal-overlay">
     <div class="modal-content">
       <span class="close" @click="$emit('close')">&times;</span>
-      <h2>Atribuir Template: {{ template.name }}</h2>
+      <h2>{{ isCreatingContract ? 'Criar Contrato' : 'Atribuir Template' }}: {{ template.name }}</h2>
 
       <div class="customer-selection">
         <h3>Selecionar Clientes</h3>
@@ -24,10 +24,12 @@
       </div>
 
       <button
-        @click="assignToCustomers"
+        @click="isCreatingContract ? createContract() : assignToCustomers()"
         :disabled="selectedCustomers.length === 0 || isAssigning"
       >
-        {{ isAssigning ? 'Atribuindo...' : `Atribuir a ${selectedCustomers.length} cliente(s)` }}
+        {{ isAssigning ? (isCreatingContract ? 'Criando...' : 'Atribuindo...') : 
+           isCreatingContract ? `Criar contrato para ${selectedCustomers.length} cliente(s)` : 
+                                `Atribuir a ${selectedCustomers.length} cliente(s)` }}
       </button>
     </div>
   </div>
@@ -53,10 +55,14 @@
     customers: {
       type: Array,
       required: true
+    },
+    isCreatingContract: {
+      type: Boolean,
+      default: false
     }
   })
 
-  const emit = defineEmits(['close', 'assigned'])
+  const emit = defineEmits(['close', 'assigned', 'contract-created'])
 
   const db = getFirestore()
   const auth = getAuth()
@@ -81,11 +87,10 @@
       // Create forms for all selected customers
       await Promise.all(
         selectedCustomers.value.map(customerId => 
-          addDoc(collection(db, 'forms'), {
+          addDoc(collection(db, 'customer_templates'), {
             templateId: props.template.id,
             templateName: templateData.name,
             customerId,
-            status: 'pending',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             officeId: props.template.officeId,
@@ -99,6 +104,49 @@
     } catch (error) {
       console.error('Error assigning template:', error)
       alert(`Erro ao atribuir template: ${error.message}`)
+    } finally {
+      isAssigning.value = false
+    }
+  }
+
+  const createContract = async () => {
+    try {
+      isAssigning.value = true
+      
+      const templateRef = doc(db, "templates", props.template.id)
+      const templateSnap = await getDoc(templateRef)
+      
+      if (!templateSnap.exists()) {
+        throw new Error('Template não encontrado')
+      }
+
+      const templateData = templateSnap.data()
+      const currentUser = auth.currentUser
+
+      // Create form documents for all selected customers
+      await Promise.all(
+        selectedCustomers.value.map(customerId => 
+          addDoc(collection(db, 'forms'), {
+            templateId: props.template.id,
+            templateName: templateData.name,
+            customerId,
+            status: 'pending',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            officeId: props.template.officeId,
+            createdBy: currentUser?.uid || 'system',
+            placeholders: templateData.placeholders || {},
+            documentData: {},
+            isContract: true
+          })
+        )
+      )
+
+      emit('contract-created')
+      emit('close')
+    } catch (error) {
+      console.error('Error creating contract:', error)
+      alert(`Erro ao criar contrato: ${error.message}`)
     } finally {
       isAssigning.value = false
     }

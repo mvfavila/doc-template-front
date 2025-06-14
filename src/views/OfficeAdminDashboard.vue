@@ -111,6 +111,13 @@
               >
                 Configurar Modelo
               </button>
+              <button
+                @click="createContract(template)"
+                :disabled="template.status !== 'processed'"
+                class="create-contract-button"
+              >
+                Criar Contrato
+              </button>
             </div>
           </div>
         </div>
@@ -173,8 +180,10 @@
       v-if="selectedTemplate"
       :template="selectedTemplate"
       :customers="customers"
+      :isCreatingContract="isCreatingContract"
       @close="selectedTemplate = null"
       @assigned="handleTemplateAssigned"
+      @contract-created="handleContractCreated"
     />
   </div>
 </template>
@@ -231,6 +240,8 @@ const showPlaceholderModal = ref(false);
 const currentTemplate = ref(null);
 const currentPlaceholders = ref({});
 const MAX_FIELD_LENGTH = 100;
+
+const isCreatingContract = ref(false);
 
 let unsubscribeTemplates = null;
 
@@ -500,6 +511,18 @@ const validateFieldLength = (event: Event, field: string, maxLength: number) => 
   }
 };
 
+const createContract = (template) => {
+  selectedTemplate.value = template;
+  isCreatingContract.value = true;
+};
+
+const handleContractCreated = () => {
+  selectedTemplate.value = null;
+  isCreatingContract.value = false;
+  successMessage.value = "Contrato(s) criado(s) com sucesso!";
+  setTimeout(() => successMessage.value = "", 3000);
+};
+
 // Lifecycle
 onMounted(async () => {
   await fetchCustomers();
@@ -758,6 +781,13 @@ button.reset-button {
   color: #e74c3c;
 }
 
+.assign-button,
+.create-contract-button,
+.edit-button {
+  width: 100%;
+  margin-top: 0;
+}
+
 .assign-button {
   background-color: #3498db;
   color: white;
@@ -765,10 +795,37 @@ button.reset-button {
   padding: 0.5rem 1rem;
   border-radius: 4px;
   cursor: pointer;
-  margin-top: 0.5rem;
 }
 
 .assign-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.create-contract-button {
+  background-color: #9b59b6;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.create-contract-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.edit-button {
+  background-color: #f39c12;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.edit-button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
 }
@@ -836,17 +893,8 @@ button.reset-button {
 
 .template-actions {
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-.edit-button {
-  background-color: #f39c12;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
   margin-top: 0.5rem;
 }
 
