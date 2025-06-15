@@ -43,7 +43,8 @@ def fill_template_and_convert(template_path: str, form_data: dict) -> tuple[str,
 
 def fill_word_template(template_path: str, output_path: str, form_data: dict):
     """
-    Fills a Word template with form data by replacing parameter placeholders.
+    Fills a Word template with form data by replacing parameter placeholders
+    while preserving all formatting.
     
     Args:
         template_path: Path to the Word template file
@@ -53,14 +54,19 @@ def fill_word_template(template_path: str, output_path: str, form_data: dict):
     try:
         doc = Document(template_path)
         
+        def replace_text_in_paragraph(paragraph, key, value):
+            """Replace text in a paragraph while preserving formatting"""
+            if f"{{{{{key}}}}}" in paragraph.text:
+                for run in paragraph.runs:
+                    if f"{{{{{key}}}}}" in run.text:
+                        run.text = run.text.replace(f"{{{{{key}}}}}", value)
+        
         # Replace parameters in paragraphs
         for paragraph in doc.paragraphs:
             for key, field_data in form_data.items():
                 # Extract the actual value from the field data object
                 value = str(field_data.get('value', '')) if isinstance(field_data, dict) else str(field_data)
-                placeholder = f"{{{{{key}}}}}"
-                if placeholder in paragraph.text:
-                    paragraph.text = paragraph.text.replace(placeholder, value)
+                replace_text_in_paragraph(paragraph, key, value)
         
         # Replace parameters in tables
         for table in doc.tables:
@@ -70,9 +76,7 @@ def fill_word_template(template_path: str, output_path: str, form_data: dict):
                         for key, field_data in form_data.items():
                             # Extract the actual value from the field data object
                             value = str(field_data.get('value', '')) if isinstance(field_data, dict) else str(field_data)
-                            placeholder = f"{{{{{key}}}}}"
-                            if placeholder in paragraph.text:
-                                paragraph.text = paragraph.text.replace(placeholder, value)
+                            replace_text_in_paragraph(paragraph, key, value)
 
         doc.save(output_path)
         print(f"Successfully filled template: {output_path}")
