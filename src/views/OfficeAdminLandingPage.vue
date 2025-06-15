@@ -109,10 +109,7 @@
                       Processando...
                     </span>
                   </template>
-                  <template v-else-if="documentStatus(doc.id) === 'failed'">
-                    <span class="error-badge">
-                      Falha na geração
-                    </span>
+                  <template v-else-if="documentStatus(doc.id) === 'failed' || (documentStatus(doc.id) === 'completed' && !doc.generatedPdfUrl)">
                     <button 
                       @click="regenerateDocument(doc.id)"
                       class="action-button regenerate-button"
@@ -136,14 +133,6 @@
                     >
                       DOCX
                     </button>
-                    <template v-if="documentStatus(doc.id) === 'failed'">
-                      <button 
-                        @click="regenerateDocument(doc.id)"
-                        class="action-button regenerate-button"
-                      >
-                        Tentar novamente
-                      </button>
-                    </template>
                   </template>
                 </td>
               </tr>
@@ -453,14 +442,24 @@ const filteredCompletedDocuments = computed(() => {
 })
 
 const documentStatus = computed(() => (docId) => {
-  const job = documentJobs.value[docId];
-  if (!job) return null;
+  const doc = filteredCompletedDocuments.value.find(d => d.id === docId);
+  if (!doc) return null;
+
+  const job = Object.values(documentJobs.value).find(j => j.formId === docId);
   
-  // Consider job active if updated in last 2 minutes
-  const isRecent = job.updatedAt && 
-    Date.now() - job.updatedAt.toDate().getTime() < 2 * 60 * 1000;
+  if (job) {
+    // Consider job active if updated in last 2 minutes
+    const isRecent = job.updatedAt && 
+      Date.now() - job.updatedAt.toDate().getTime() < 2 * 60 * 1000;
+
+    if (isRecent) return job.status;
+
+    if (job.status === 'completed') return job.status;
+    
+    return 'failed';
+  }
   
-  return isRecent ? job.status : 'failed';
+  return doc.status;
 });
 
 // Methods
@@ -742,36 +741,6 @@ onUnmounted(() => {
   text-align: center;
   color: #666;
   font-style: italic;
-}
-
-.error-badge {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  background-color: #e74c3c;
-  color: white;
-  border-radius: 50%;
-  text-align: center;
-  line-height: 18px;
-  font-size: 12px;
-  margin-left: 5px;
-  cursor: help;
-  position: relative;
-  margin-left: 0.5rem;
-}
-
-.error-badge:hover::after {
-  content: "Arquivo indisponível";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #333;
-  color: white;
-  padding: 5px;
-  border-radius: 4px;
-  white-space: nowrap;
-  z-index: 100;
 }
 
 .loading-indicator {
