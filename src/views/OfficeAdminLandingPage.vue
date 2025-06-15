@@ -109,7 +109,7 @@
                       Processando...
                     </span>
                   </template>
-                  <template v-else-if="documentStatus(doc.id) === 'failed'">
+                  <template v-else-if="documentStatus(doc.id) === 'failed' || (documentStatus(doc.id) === 'completed' && !doc.generatedPdfUrl)">
                     <button 
                       @click="regenerateDocument(doc.id)"
                       class="action-button regenerate-button"
@@ -133,14 +133,6 @@
                     >
                       DOCX
                     </button>
-                    <template v-if="documentStatus(doc.id) === 'failed' || (documentStatus(doc.id) === 'completed' && !doc.generatedPdfUrl)">
-                      <button 
-                        @click="regenerateDocument(doc.id)"
-                        class="action-button regenerate-button"
-                      >
-                        Tentar novamente
-                      </button>
-                    </template>
                   </template>
                 </td>
               </tr>
@@ -459,8 +451,12 @@ const documentStatus = computed(() => (docId) => {
     // Consider job active if updated in last 2 minutes
     const isRecent = job.updatedAt && 
       Date.now() - job.updatedAt.toDate().getTime() < 2 * 60 * 1000;
+
+    if (isRecent) return job.status;
+
+    if (job.status === 'completed') return job.status;
     
-    return isRecent ? job.status : 'failed';
+    return 'failed';
   }
   
   return doc.status;
